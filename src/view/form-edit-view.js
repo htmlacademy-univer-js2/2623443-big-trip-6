@@ -128,11 +128,8 @@ function createFormEditTemplate(point, destination, availableOffers, selectedOff
           </div>
           <button class="event__save-btn btn btn--blue" type="submit">Save</button>
           <button class="event__reset-btn" type="reset">Delete</button>
-          <button class="event__rollup-btn" type="button">
-            <span class="visually-hidden">Open event</span>
-            <svg class="event__rollup-icon" width="17" height="17" viewBox="0 0 17 17">
-              <path d="M13.5 8.5L8.5 3.5 3.5 8.5" stroke="#000" fill="none" stroke-width="1.5" stroke-linejoin="round"/>
-            </svg>
+          <button class='event__rollup-btn' type='button'>
+            <span class='visually-hidden'>Open event</span>
           </button>
         </header>
         ${(destinationTemplate || offersTemplate) ? `
