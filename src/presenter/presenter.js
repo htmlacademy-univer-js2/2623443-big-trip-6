@@ -1,20 +1,21 @@
 import FiltersView from '../view/filters-view.js';
 import SortView from '../view/sort-view.js';
 import FormCreateView from '../view/form-create-view.js';
-import FormEditView from '../view/form-edit-view.js';
-import PointItemView from '../view/point-item-view.js';
+import NoPointsView from '../view/no-points-view.js';
+import PointPresenter from './point-presenter.js';
 //import PointsModel from '../model/points-model.js';
-import { render, replace, remove } from '../framework/render.js';
+import { render, remove } from '../framework/render.js';
 
 export default class Presenter {
   #listComponent = null;
   #pointsModel = null;
-  #pointComponents = new Map();
+  #pointPresenters = new Map();
   #formCreateComponent = null;
-  #formEditComponent = null;
-  #editedPointId = null;
   #filtersComponent = null;
   #sortComponent = null;
+  #noPointsComponent = null;
+  #currentFilter = 'everything';
+  #currentSort = 'day';
 
   constructor({listComponent, pointsModel}) {
     this.#listComponent = listComponent;
@@ -31,7 +32,7 @@ export default class Presenter {
   #renderFilters() {
     const filtersContainer = document.querySelector('.trip-controls__filters');
     if (filtersContainer) {
-      this.#filtersComponent = new FiltersView();
+      this.#filtersComponent = new FiltersView({currentFilter: this.#currentFilter});
       render(this.#filtersComponent, filtersContainer);
     }
   }
@@ -39,9 +40,45 @@ export default class Presenter {
   #renderSort() {
     const sortContainer = document.querySelector('.trip-events');
     if (sortContainer) {
-      this.#sortComponent = new SortView();
+      this.#sortComponent = new SortView({currentSort: this.#currentSort});
       render(this.#sortComponent, sortContainer, 'afterbegin');
     }
+  }
+
+  #renderPoints() {
+    this.#clearList();
+    const points = this.#pointsModel.getPoints();
+
+    if (points.length === 0) {
+      this.#renderNoPoints();
+      return;
+    }
+
+    points.forEach((point) => {
+      const pointPresenter = new PointPresenter({
+        listComponent: this.#listComponent,
+        point,
+        model: this.#pointsModel,
+        onDataChange: this.#handleViewAction,
+        onModeChange: this.#handleModeChange
+      });
+
+      this.#pointPresenters.set(point.id, pointPresenter);
+      pointPresenter.init();
+    });
+  }
+
+  #renderNoPoints() {
+    this.#noPointsComponent = new NoPointsView();
+    render(this.#noPointsComponent, this.#listComponent);
+  }
+
+  #clearList() {
+    if (this.#noPointsComponent) {
+      remove(this.#noPointsComponent);
+      this.#noPointsComponent = null;
+    }
+    this.#pointPresenters.clear();
   }
 
   #setNewEventButtonListener() {
@@ -56,12 +93,7 @@ export default class Presenter {
       return;
     }
 
-    if (this.#formEditComponent) {
-      const point = this.#pointsModel.getPoints().find((p) => p.id === this.#editedPointId);
-      if (point) {
-        this.#removeFormEdit(point);
-      }
-    }
+    this.#resetAllViews();
 
     this.#renderFormCreate();
   }
@@ -75,101 +107,34 @@ export default class Presenter {
       defaultType,
       destinations,
       availableOffers,
-      onFormSubmit: () => this.#handleFormCreateSubmit(),
+      onFormSubmit: () => {},
       onFormClose: () => this.#removeFormCreate()
     });
 
     render(this.#formCreateComponent, this.#listComponent, 'afterbegin');
-    document.addEventListener('keydown', this.#escKeyDownHandler);
   }
 
   #removeFormCreate() {
     if (this.#formCreateComponent) {
       remove(this.#formCreateComponent);
       this.#formCreateComponent = null;
-      document.removeEventListener('keydown', this.#escKeyDownHandler);
     }
   }
 
-  #handleFormCreateSubmit() {
-  }
-
-  #renderPoints() {
-    const points = this.#pointsModel.getPoints();
-    points.forEach((point) => this.#renderPoint(point));
-  }
-
-  #renderPoint(point) {
-    const destination = this.#pointsModel.getDestinationById(point.destinationId);
-    const offersList = this.#pointsModel.getOffersByIds(point.offersIds);
-
-    const pointComponent = new PointItemView({
-      point,
-      destination,
-      offersList,
-      onEditClick: () => this.#handlePointEdit(point)
-    });
-
-    this.#pointComponents.set(point.id, pointComponent);
-    render(pointComponent, this.#listComponent);
-  }
-
-  #handlePointEdit(point) {
-    if (this.#formCreateComponent) {
-      this.#removeFormCreate();
-    }
-
-    this.#editedPointId = point.id;
-    const pointComponent = this.#pointComponents.get(point.id);
-
-    const destination = this.#pointsModel.getDestinationById(point.destinationId);
-    const availableOffers = this.#pointsModel.getOffersByType(point.type);
-
-    this.#formEditComponent = new FormEditView({
-      point,
-      destination,
-      availableOffers,
-      selectedOfferIds: point.offersIds,
-      onFormSubmit: () => this.#handleFormEditSubmit(),
-      onFormClose: () => this.#handleFormEditClose(point)
-    });
-
-    replace(this.#formEditComponent, pointComponent);
-    document.addEventListener('keydown', this.#escKeyDownHandler);
-  }
-
-  #handleFormEditSubmit() {
-  }
-
-  #handleFormEditClose(point) {
-    this.#removeFormEdit(point);
-  }
-
-  #removeFormEdit(point) {
-    if (this.#formEditComponent) {
-      const pointComponent = this.#pointComponents.get(point.id);
-      replace(pointComponent, this.#formEditComponent);
-      this.#formEditComponent = null;
-      this.#editedPointId = null;
-      document.removeEventListener('keydown', this.#escKeyDownHandler);
-    }
-  }
-
-  #escKeyDownHandler = (evt) => {
-    if (evt.key === 'Escape' || evt.key === 'Esc') {
-      evt.preventDefault();
-
-      if (this.#formCreateComponent) {
-        this.#removeFormCreate();
-        return;
-      }
-
-      if (this.#formEditComponent) {
-        const point = this.#pointsModel.getPoints().find((p) => p.id === this.#editedPointId);
-        if (point) {
-          this.#handleFormEditClose(point);
-        }
-      }
+  #handleViewAction = (updatedPoint) => {
+    this.#pointsModel.updatePoint(updatedPoint);
+    const pointPresenter = this.#pointPresenters.get(updatedPoint.id);
+    if (pointPresenter) {
+      pointPresenter.updatePoint(updatedPoint);
     }
   };
+
+  #handleModeChange = () => {
+    this.#resetAllViews();
+  };
+
+  #resetAllViews() {
+    this.#pointPresenters.forEach((presenter) => presenter.resetView());
+    this.#removeFormCreate();
+  }
 }

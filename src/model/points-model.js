@@ -34,4 +34,12 @@ export default class PointsModel {
     const typeOffers = this.#offersByType[type];
     return typeOffers || [];
   }
+
+  updatePoint(update) {
+    const index = this.#points.findIndex((point) => point.id === update.id);
+    if (index === -1) {
+      throw new Error('Can\'t update unexisting point');
+    }
+    this.#points[index] = update;
+  }
 }
