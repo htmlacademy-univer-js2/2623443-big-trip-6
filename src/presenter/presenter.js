@@ -6,6 +6,16 @@ import PointPresenter from './point-presenter.js';
 //import PointsModel from '../model/points-model.js';
 import { render, remove } from '../framework/render.js';
 
+const sortPointsByDate = (pointA, pointB) => new Date(pointA.dateFrom) - new Date(pointB.dateFrom);
+
+const sortPointsByTime = (pointA, pointB) => {
+  const durationA = new Date(pointA.dateTo) - new Date(pointA.dateFrom);
+  const durationB = new Date(pointB.dateTo) - new Date(pointB.dateFrom);
+  return durationB - durationA;
+};
+
+const sortPointsByPrice = (pointA, pointB) => pointB.basePrice - pointA.basePrice;
+
 export default class Presenter {
   #listComponent = null;
   #pointsModel = null;
@@ -15,7 +25,7 @@ export default class Presenter {
   #sortComponent = null;
   #noPointsComponent = null;
   #currentFilter = 'everything';
-  #currentSort = 'day';
+  #currentSortType = 'day';
 
   constructor({listComponent, pointsModel}) {
     this.#listComponent = listComponent;
@@ -40,18 +50,42 @@ export default class Presenter {
   #renderSort() {
     const sortContainer = document.querySelector('.trip-events');
     if (sortContainer) {
-      this.#sortComponent = new SortView({currentSort: this.#currentSort});
+      this.#sortComponent = new SortView({
+        currentSortType: this.#currentSortType,
+        onSortTypeChange: this.#handleSortTypeChange
+      });
       render(this.#sortComponent, sortContainer, 'afterbegin');
     }
   }
 
+  #handleSortTypeChange = (sortType) => {
+    if (this.#currentSortType === sortType) {
+      return;
+    }
+    this.#currentSortType = sortType;
+    this.#renderPoints();
+  };
+
   #renderPoints() {
     this.#clearList();
-    const points = this.#pointsModel.getPoints();
+    let points = this.#pointsModel.getPoints();
 
     if (points.length === 0) {
       this.#renderNoPoints();
       return;
+    }
+
+    switch (this.#currentSortType) {
+      case 'time':
+        points = [...points].sort(sortPointsByTime);
+        break;
+      case 'price':
+        points = [...points].sort(sortPointsByPrice);
+        break;
+      case 'day':
+      default:
+        points = [...points].sort(sortPointsByDate);
+        break;
     }
 
     points.forEach((point) => {
@@ -62,7 +96,6 @@ export default class Presenter {
         onDataChange: this.#handleViewAction,
         onModeChange: this.#handleModeChange
       });
-
       this.#pointPresenters.set(point.id, pointPresenter);
       pointPresenter.init();
     });
@@ -78,6 +111,7 @@ export default class Presenter {
       remove(this.#noPointsComponent);
       this.#noPointsComponent = null;
     }
+    this.#listComponent.innerHTML = '';
     this.#pointPresenters.clear();
   }
 
@@ -92,9 +126,7 @@ export default class Presenter {
     if (this.#formCreateComponent) {
       return;
     }
-
     this.#resetAllViews();
-
     this.#renderFormCreate();
   }
 

@@ -19,7 +19,6 @@ function createPoint(id, type, destinationId, offersIds, basePrice, dateFrom, da
   };
 }
 
-// Офферы сгруппированы по типам точек маршрута
 export function offersByType() {
   return {
     taxi: [
@@ -64,7 +63,6 @@ export function offersByType() {
   };
 }
 
-// Вспомогательная функция для получения всех офферов плоским списком (для совместимости)
 export function offers() {
   const allOffers = offersByType();
   return Object.values(allOffers).flat();
@@ -73,11 +71,11 @@ export function offers() {
 export function destinations() {
   return [
     createDestination('dest-1', 'Amsterdam', 'Beautiful city with canals', [
-      'img/amsterdam-1.jpg',
-      'img/amsterdam-2.jpg'
+      'img/photos/1.jpg',
+      'img/photos/2.jpg'
     ]),
     createDestination('dest-2', 'Geneva', 'City of peace and lakes', [
-      'img/geneva-1.jpg'
+      'img/photos/3.jpg'
     ]),
     createDestination('dest-3', 'Chamonix', 'Alpine paradise', []),
   ];
