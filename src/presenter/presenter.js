@@ -3,155 +3,173 @@ import SortView from '../view/sort-view.js';
 import FormCreateView from '../view/form-create-view.js';
 import FormEditView from '../view/form-edit-view.js';
 import PointItemView from '../view/point-item-view.js';
-import PointsModel from '../model/points-model.js';
+//import PointsModel from '../model/points-model.js';
+import { render, replace, remove } from '../framework/render.js';
 
 export default class Presenter {
-  constructor() {
-    this.model = new PointsModel();
-    this.filtersComponent = null;
-    this.sortComponent = null;
-    this.formCreateComponent = null;
-    this.formEditComponent = null;
-    this.pointItemsComponents = [];
-    this.editedPointComponent = null;
+  #listComponent = null;
+  #pointsModel = null;
+  #pointComponents = new Map();
+  #formCreateComponent = null;
+  #formEditComponent = null;
+  #editedPointId = null;
+  #filtersComponent = null;
+  #sortComponent = null;
 
-    this.handleNewEventClick = this.handleNewEventClick.bind(this);
-    this.handleEscKey = this.handleEscKey.bind(this);
+  constructor({listComponent, pointsModel}) {
+    this.#listComponent = listComponent;
+    this.#pointsModel = pointsModel;
   }
 
   init() {
-    this.renderFilters();
-    this.renderSort();
-    this.renderPointItems();
-    this.setNewEventButtonListener();
-    document.addEventListener('keydown', this.handleEscKey);
+    this.#renderFilters();
+    this.#renderSort();
+    this.#renderPoints();
+    this.#setNewEventButtonListener();
   }
 
-  setNewEventButtonListener() {
+  #renderFilters() {
+    const filtersContainer = document.querySelector('.trip-controls__filters');
+    if (filtersContainer) {
+      this.#filtersComponent = new FiltersView();
+      render(this.#filtersComponent, filtersContainer);
+    }
+  }
+
+  #renderSort() {
+    const sortContainer = document.querySelector('.trip-events');
+    if (sortContainer) {
+      this.#sortComponent = new SortView();
+      render(this.#sortComponent, sortContainer, 'afterbegin');
+    }
+  }
+
+  #setNewEventButtonListener() {
     const newEventButton = document.querySelector('.trip-main__event-add-btn');
     if (newEventButton) {
-      newEventButton.addEventListener('click', this.handleNewEventClick);
+      newEventButton.addEventListener('click', () => this.#handleNewEventClick());
     }
   }
 
-  handleNewEventClick() {
-    this.closeForm();
-    this.renderFormCreate();
-  }
-
-  handleEscKey(evt) {
-    if (evt.key === 'Escape' || evt.key === 'Esc') {
-      this.closeForm();
+  #handleNewEventClick() {
+    if (this.#formCreateComponent) {
+      return;
     }
-  }
 
-  closeForm() {
-    if (this.formEditComponent && this.editedPointComponent) {
-      const formElement = this.formEditComponent.getElement();
-      const pointElement = this.editedPointComponent.getElement();
-      if (formElement.parentNode) {
-        formElement.replaceWith(pointElement);
+    if (this.#formEditComponent) {
+      const point = this.#pointsModel.getPoints().find((p) => p.id === this.#editedPointId);
+      if (point) {
+        this.#removeFormEdit(point);
       }
-      this.formEditComponent.removeElement();
-      this.formEditComponent = null;
-      this.editedPointComponent = null;
     }
 
-    if (this.formCreateComponent) {
-      this.formCreateComponent.removeElement();
-      this.formCreateComponent = null;
-    }
+    this.#renderFormCreate();
   }
 
-  renderFilters() {
-    const container = document.querySelector('.trip-controls__filters');
-    if (container) {
-      this.filtersComponent = new FiltersView();
-      container.appendChild(this.filtersComponent.getElement());
-    }
-  }
-
-  renderSort() {
-    const container = document.querySelector('.trip-events');
-    const listElement = document.querySelector('.trip-events__list');
-    if (container && listElement) {
-      this.sortComponent = new SortView();
-      container.insertBefore(this.sortComponent.getElement(), listElement);
-    }
-  }
-
-  renderPointItems() {
-    const container = document.querySelector('.trip-events__list');
-    if (container) {
-      const points = this.model.getPoints();
-      this.pointItemsComponents = [];
-      points.forEach((point) => {
-        const destination = this.model.getDestinationById(point.destinationId);
-        const offersList = this.model.getOffersByIds(point.offersIds);
-        const pointView = new PointItemView(point, destination, offersList);
-        pointView.getElement().querySelector('.event__rollup-btn').addEventListener('click', () => {
-          this.handleEditClick(point);
-        });
-        this.pointItemsComponents.push(pointView);
-        container.appendChild(pointView.getElement());
-      });
-    }
-  }
-
-  handleEditClick(point) {
-    this.closeForm();
-    this.renderFormEdit(point);
-  }
-
-  renderFormCreate() {
-    const container = document.querySelector('.trip-events__list');
-    if (!container) {
-      return;
-    }
-
-    const destinations = this.model.getDestinations();
+  #renderFormCreate() {
+    const destinations = this.#pointsModel.getDestinations();
     const defaultType = 'flight';
-    const availableOffers = this.model.getOffersByType(defaultType);
+    const availableOffers = this.#pointsModel.getOffersByType(defaultType);
 
-    this.formCreateComponent = new FormCreateView(defaultType, destinations, availableOffers);
-    container.prepend(this.formCreateComponent.getElement());
-
-    const cancelButton = this.formCreateComponent.getElement().querySelector('.event__reset-btn');
-    cancelButton.addEventListener('click', (evt) => {
-      evt.preventDefault();
-      this.closeForm();
+    this.#formCreateComponent = new FormCreateView({
+      defaultType,
+      destinations,
+      availableOffers,
+      onFormSubmit: () => this.#handleFormCreateSubmit(),
+      onFormClose: () => this.#removeFormCreate()
     });
+
+    render(this.#formCreateComponent, this.#listComponent, 'afterbegin');
+    document.addEventListener('keydown', this.#escKeyDownHandler);
   }
 
-  renderFormEdit(point) {
-    const container = document.querySelector('.trip-events__list');
-    if (!container) {
-      return;
+  #removeFormCreate() {
+    if (this.#formCreateComponent) {
+      remove(this.#formCreateComponent);
+      this.#formCreateComponent = null;
+      document.removeEventListener('keydown', this.#escKeyDownHandler);
     }
-
-    const destination = this.model.getDestinationById(point.destinationId);
-    const availableOffers = this.model.getOffersByType(point.type);
-
-    this.formEditComponent = new FormEditView(point, destination, availableOffers, point.offersIds);
-
-    const pointComponent = this.pointItemsComponents.find((p) => p.point.id === point.id);
-    if (pointComponent) {
-      this.editedPointComponent = pointComponent;
-      const pointElement = pointComponent.getElement();
-      pointElement.replaceWith(this.formEditComponent.getElement());
-    } else {
-      container.appendChild(this.formEditComponent.getElement());
-    }
-
-    const rollupButton = this.formEditComponent.getElement().querySelector('.event__rollup-btn');
-    rollupButton.addEventListener('click', () => {
-      this.closeForm();
-    });
-
-    const cancelButton = this.formEditComponent.getElement().querySelector('.event__reset-btn');
-    cancelButton.addEventListener('click', (evt) => {
-      evt.preventDefault();
-      this.closeForm();
-    });
   }
+
+  #handleFormCreateSubmit() {
+  }
+
+  #renderPoints() {
+    const points = this.#pointsModel.getPoints();
+    points.forEach((point) => this.#renderPoint(point));
+  }
+
+  #renderPoint(point) {
+    const destination = this.#pointsModel.getDestinationById(point.destinationId);
+    const offersList = this.#pointsModel.getOffersByIds(point.offersIds);
+
+    const pointComponent = new PointItemView({
+      point,
+      destination,
+      offersList,
+      onEditClick: () => this.#handlePointEdit(point)
+    });
+
+    this.#pointComponents.set(point.id, pointComponent);
+    render(pointComponent, this.#listComponent);
+  }
+
+  #handlePointEdit(point) {
+    if (this.#formCreateComponent) {
+      this.#removeFormCreate();
+    }
+
+    this.#editedPointId = point.id;
+    const pointComponent = this.#pointComponents.get(point.id);
+
+    const destination = this.#pointsModel.getDestinationById(point.destinationId);
+    const availableOffers = this.#pointsModel.getOffersByType(point.type);
+
+    this.#formEditComponent = new FormEditView({
+      point,
+      destination,
+      availableOffers,
+      selectedOfferIds: point.offersIds,
+      onFormSubmit: () => this.#handleFormEditSubmit(),
+      onFormClose: () => this.#handleFormEditClose(point)
+    });
+
+    replace(this.#formEditComponent, pointComponent);
+    document.addEventListener('keydown', this.#escKeyDownHandler);
+  }
+
+  #handleFormEditSubmit() {
+  }
+
+  #handleFormEditClose(point) {
+    this.#removeFormEdit(point);
+  }
+
+  #removeFormEdit(point) {
+    if (this.#formEditComponent) {
+      const pointComponent = this.#pointComponents.get(point.id);
+      replace(pointComponent, this.#formEditComponent);
+      this.#formEditComponent = null;
+      this.#editedPointId = null;
+      document.removeEventListener('keydown', this.#escKeyDownHandler);
+    }
+  }
+
+  #escKeyDownHandler = (evt) => {
+    if (evt.key === 'Escape' || evt.key === 'Esc') {
+      evt.preventDefault();
+
+      if (this.#formCreateComponent) {
+        this.#removeFormCreate();
+        return;
+      }
+
+      if (this.#formEditComponent) {
+        const point = this.#pointsModel.getPoints().find((p) => p.id === this.#editedPointId);
+        if (point) {
+          this.#handleFormEditClose(point);
+        }
+      }
+    }
+  };
 }

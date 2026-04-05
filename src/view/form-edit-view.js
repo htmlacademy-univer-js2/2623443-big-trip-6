@@ -1,4 +1,4 @@
-import { createElement } from '../render.js';
+import AbstractView from '../framework/view/abstract-view.js';
 
 function formatDateForInput(dateString) {
   if (!dateString) {
@@ -16,7 +16,6 @@ function formatDateForInput(dateString) {
 function createFormEditTemplate(point, destination, availableOffers, selectedOfferIds = []) {
   const { type, basePrice, dateFrom, dateTo } = point;
   const destinationName = destination?.name || '';
-
   const offersTemplate = availableOffers.length ? `
     <section class="event__section event__section--offers">
       <h3 class="event__section-title event__section-title--offers">Offers</h3>
@@ -42,7 +41,6 @@ function createFormEditTemplate(point, destination, availableOffers, selectedOff
       </div>
     </section>
   ` : '';
-
   const destinationTemplate = (destination?.description || destination?.pictures?.length) ? `
     <section class="event__section event__section--destination">
       <h3 class="event__section-title event__section-title--destination">Destination</h3>
@@ -148,35 +146,43 @@ function createFormEditTemplate(point, destination, availableOffers, selectedOff
   `;
 }
 
-export default class FormEditView {
-  constructor(point, destination, availableOffers, selectedOfferIds = []) {
-    this.point = point;
-    this.destination = destination;
-    this.availableOffers = availableOffers;
-    this.selectedOfferIds = selectedOfferIds;
-    this.element = null;
+export default class FormEditView extends AbstractView {
+  #point = null;
+  #destination = null;
+  #availableOffers = null;
+  #selectedOfferIds = null;
+  #onFormSubmit = null;
+  #onFormClose = null;
+
+  constructor({point, destination, availableOffers, selectedOfferIds, onFormSubmit, onFormClose}) {
+    super();
+    this.#point = point;
+    this.#destination = destination;
+    this.#availableOffers = availableOffers;
+    this.#selectedOfferIds = selectedOfferIds;
+    this.#onFormSubmit = onFormSubmit;
+    this.#onFormClose = onFormClose;
+    this.element.querySelector('form').addEventListener('submit', this.#formSubmitHandler);
+    this.element.querySelector('.event__rollup-btn').addEventListener('click', this.#formCloseHandler);
+    this.element.querySelector('.event__reset-btn').addEventListener('click', this.#formCloseHandler);
   }
 
-  getTemplate() {
+  get template() {
     return createFormEditTemplate(
-      this.point,
-      this.destination,
-      this.availableOffers,
-      this.selectedOfferIds
+      this.#point,
+      this.#destination,
+      this.#availableOffers,
+      this.#selectedOfferIds
     );
   }
 
-  getElement() {
-    if (!this.element) {
-      this.element = createElement(this.getTemplate());
-    }
-    return this.element;
-  }
+  #formSubmitHandler = (evt) => {
+    evt.preventDefault();
+    this.#onFormSubmit();
+  };
 
-  removeElement() {
-    if (this.element) {
-      this.element.remove();
-      this.element = null;
-    }
-  }
+  #formCloseHandler = (evt) => {
+    evt.preventDefault();
+    this.#onFormClose();
+  };
 }

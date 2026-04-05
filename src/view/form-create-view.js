@@ -1,10 +1,9 @@
-import { createElement } from '../render.js';
+import AbstractView from '../framework/view/abstract-view.js';
 
 function createFormCreateTemplate(defaultType = 'flight', destinations = [], availableOffers = []) {
   const destinationOptions = destinations.length
     ? destinations.map((dest) => `<option value="${dest.name}"></option>`).join('')
     : '';
-
   const offersTemplate = availableOffers.length ? `
     <section class="event__section event__section--offers">
       <h3 class="event__section-title event__section-title--offers">Offers</h3>
@@ -105,29 +104,35 @@ function createFormCreateTemplate(defaultType = 'flight', destinations = [], ava
   `;
 }
 
-export default class FormCreateView {
-  constructor(defaultType = 'flight', destinations = [], availableOffers = []) {
-    this.defaultType = defaultType;
-    this.destinations = destinations;
-    this.availableOffers = availableOffers;
-    this.element = null;
+export default class FormCreateView extends AbstractView {
+  #defaultType = null;
+  #destinations = null;
+  #availableOffers = null;
+  #onFormSubmit = null;
+  #onFormClose = null;
+
+  constructor({defaultType = 'flight', destinations, availableOffers, onFormSubmit, onFormClose}) {
+    super();
+    this.#defaultType = defaultType;
+    this.#destinations = destinations;
+    this.#availableOffers = availableOffers;
+    this.#onFormSubmit = onFormSubmit;
+    this.#onFormClose = onFormClose;
+    this.element.querySelector('form').addEventListener('submit', this.#formSubmitHandler);
+    this.element.querySelector('.event__reset-btn').addEventListener('click', this.#formCloseHandler);
   }
 
-  getTemplate() {
-    return createFormCreateTemplate(this.defaultType, this.destinations, this.availableOffers);
+  get template() {
+    return createFormCreateTemplate(this.#defaultType, this.#destinations, this.#availableOffers);
   }
 
-  getElement() {
-    if (!this.element) {
-      this.element = createElement(this.getTemplate());
-    }
-    return this.element;
-  }
+  #formSubmitHandler = (evt) => {
+    evt.preventDefault();
+    this.#onFormSubmit();
+  };
 
-  removeElement() {
-    if (this.element) {
-      this.element.remove();
-      this.element = null;
-    }
-  }
+  #formCloseHandler = (evt) => {
+    evt.preventDefault();
+    this.#onFormClose();
+  };
 }
