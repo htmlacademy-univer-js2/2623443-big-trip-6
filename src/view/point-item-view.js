@@ -1,16 +1,13 @@
-import { createElement } from '../render.js';
+import AbstractView from '../framework/view/abstract-view.js';
 
 function createPointItemTemplate(point, destination, offersList) {
   const { type, basePrice, dateFrom, dateTo, isFavorite } = point;
-
   const date = new Date(dateFrom);
   const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase();
   const day = date.getDate();
   const formattedDate = `${month} ${day}`;
-
   const startTime = new Date(dateFrom).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const endTime = new Date(dateTo).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
   const durationMs = new Date(dateTo) - new Date(dateFrom);
   const durationMinutes = Math.floor(durationMs / 60000);
   let durationStr = '';
@@ -21,10 +18,8 @@ function createPointItemTemplate(point, destination, offersList) {
   } else {
     durationStr = `${Math.floor(durationMinutes / 1440)}D ${Math.floor((durationMinutes % 1440) / 60)}H ${durationMinutes % 60}M`;
   }
-
   const typeIcon = `img/icons/${type}.png`;
   const destinationName = destination ? destination.name : '';
-
   const offersHtml = offersList.map((offer) => `
     <li class="event__offer">
       <span class="event__offer-title">${offer.title}</span>
@@ -32,11 +27,10 @@ function createPointItemTemplate(point, destination, offersList) {
       <span class="event__offer-price">${offer.price}</span>
     </li>
   `).join('');
-
   const favoriteClass = isFavorite ? 'event__favorite-btn--active' : '';
 
   return `
-    <li class="trip-events__item" data-point-id="${point.id}">
+    <li class="trip-events__item">
       <div class="event">
         <time class="event__date" datetime="${dateFrom.split('T')[0]}">${formattedDate}</time>
         <div class="event__type">
@@ -75,29 +69,27 @@ function createPointItemTemplate(point, destination, offersList) {
   `;
 }
 
-export default class PointItemView {
-  constructor(point, destination, offersList) {
-    this.point = point;
-    this.destination = destination;
-    this.offersList = offersList;
-    this.element = null;
+export default class PointItemView extends AbstractView {
+  #point = null;
+  #destination = null;
+  #offersList = null;
+  #onEditClick = null;
+
+  constructor({point, destination, offersList, onEditClick}) {
+    super();
+    this.#point = point;
+    this.#destination = destination;
+    this.#offersList = offersList;
+    this.#onEditClick = onEditClick;
+    this.element.querySelector('.event__rollup-btn').addEventListener('click', this.#editClickHandler);
   }
 
-  getTemplate() {
-    return createPointItemTemplate(this.point, this.destination, this.offersList);
+  get template() {
+    return createPointItemTemplate(this.#point, this.#destination, this.#offersList);
   }
 
-  getElement() {
-    if (!this.element) {
-      this.element = createElement(this.getTemplate());
-    }
-    return this.element;
-  }
-
-  removeElement() {
-    if (this.element) {
-      this.element.remove();
-      this.element = null;
-    }
-  }
+  #editClickHandler = (evt) => {
+    evt.preventDefault();
+    this.#onEditClick();
+  };
 }
