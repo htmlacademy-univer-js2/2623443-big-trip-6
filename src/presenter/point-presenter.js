@@ -1,6 +1,7 @@
 import PointItemView from '../view/point-item-view.js';
 import FormEditView from '../view/form-edit-view.js';
-import { render, replace } from '../framework/render.js';
+import { render, replace, remove } from '../framework/render.js';
+import { UpdateType } from '../const.js';
 
 export default class PointPresenter {
   #listComponent = null;
@@ -21,6 +22,15 @@ export default class PointPresenter {
 
   init() {
     this.#renderPoint();
+  }
+
+  destroy() {
+    if (this.#pointComponent) {
+      remove(this.#pointComponent);
+    }
+    if (this.#formEditComponent) {
+      remove(this.#formEditComponent);
+    }
   }
 
   #renderPoint() {
@@ -53,8 +63,9 @@ export default class PointPresenter {
       offersByType,
       onFormSubmit: (state) => this.#handleFormSubmit(state),
       onFormClose: () => this.#handleFormClose(),
-      onTypeChange: (type) => this.#handleTypeChange(type),
-      onDestinationChange: (id) => this.#handleDestinationChange(id)
+      onTypeChange: () => {},
+      onDestinationChange: () => {},
+      onDeleteClick: () => this.#handleDeleteClick()
     });
 
     replace(this.#formEditComponent, this.#pointComponent);
@@ -91,7 +102,7 @@ export default class PointPresenter {
       offersIds: offers
     };
     this.#point = updatedPoint;
-    this.#onDataChange(updatedPoint);
+    this.#onDataChange(UpdateType.PATCH, updatedPoint);
     this.resetView();
   }
 
@@ -100,10 +111,10 @@ export default class PointPresenter {
       ...this.#point,
       isFavorite: !this.#point.isFavorite
     };
-    this.#onDataChange(updatedPoint);
+    this.#onDataChange(UpdateType.PATCH, updatedPoint);
   }
 
-  #handleTypeChange() {}
-
-  #handleDestinationChange() {}
+  #handleDeleteClick() {
+    this.#onDataChange(UpdateType.DELETE, this.#point);
+  }
 }

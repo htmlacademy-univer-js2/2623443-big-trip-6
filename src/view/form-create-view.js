@@ -151,12 +151,10 @@ export default class FormCreateView extends AbstractStatefulView {
   #offersByType = null;
   #onFormSubmit = null;
   #onFormClose = null;
-  #onTypeChange = null;
-  #onDestinationChange = null;
   #datepickerStart = null;
   #datepickerEnd = null;
 
-  constructor({defaultType = 'flight', destinations, offersByType, onFormSubmit, onFormClose, onTypeChange, onDestinationChange}) {
+  constructor({defaultType = 'flight', destinations, offersByType, onFormSubmit, onFormClose}) {
     super();
     this._setState({
       type: defaultType,
@@ -170,8 +168,6 @@ export default class FormCreateView extends AbstractStatefulView {
     this.#offersByType = offersByType;
     this.#onFormSubmit = onFormSubmit;
     this.#onFormClose = onFormClose;
-    this.#onTypeChange = onTypeChange;
-    this.#onDestinationChange = onDestinationChange;
     this._restoreHandlers();
   }
 
@@ -191,6 +187,13 @@ export default class FormCreateView extends AbstractStatefulView {
 
     this.element.querySelectorAll('.event__offer-checkbox').forEach((checkbox) => {
       checkbox.addEventListener('change', (evt) => this.#offerChangeHandler(evt));
+    });
+
+    this.element.querySelector('.event__input--price').addEventListener('input', (evt) => {
+      evt.target.value = evt.target.value.replace(/[^0-9]/g, '');
+    });
+    this.element.querySelector('.event__input--price').addEventListener('change', (evt) => {
+      this._setState({ ...this._state, basePrice: Number(evt.target.value) || 0 });
     });
 
     const startTimeElement = this.element.querySelector('[name="event-start-time"]');
@@ -239,7 +242,6 @@ export default class FormCreateView extends AbstractStatefulView {
     if (!newType) {
       return;
     }
-    this.#onTypeChange(newType);
     this.updateElement({
       ...this._state,
       type: newType,
@@ -253,7 +255,6 @@ export default class FormCreateView extends AbstractStatefulView {
     if (!destination) {
       return;
     }
-    this.#onDestinationChange(destination.id);
     this.updateElement({
       ...this._state,
       destinationId: destination.id
