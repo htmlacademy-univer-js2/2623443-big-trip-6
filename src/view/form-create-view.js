@@ -1,29 +1,78 @@
-import AbstractView from '../framework/view/abstract-view.js';
+import AbstractStatefulView from '../framework/view/abstract-stateful-view.js';
 
-function createFormCreateTemplate(defaultType = 'flight', destinations = [], availableOffers = []) {
-  const destinationOptions = destinations.length
-    ? destinations.map((dest) => `<option value="${dest.name}"></option>`).join('')
-    : '';
+function formatDateForInput(dateString) {
+  if (!dateString) {
+    return '';
+  }
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
+
+function parseDateInput(value) {
+  if (!value) {
+    return null;
+  }
+  const [datePart, timePart] = value.split(' ');
+  if (!datePart || !timePart) {
+    return null;
+  }
+  const [day, month, year] = datePart.split('/');
+  const [hours, minutes] = timePart.split(':');
+  const fullYear = `20${year}`;
+  const date = new Date(Date.UTC(fullYear, month - 1, day, hours, minutes));
+  return date.toISOString();
+}
+
+function createFormCreateTemplate(state, destinations, offersByType) {
+  const { type, basePrice, dateFrom, dateTo, destinationId, offers } = state;
+  const destination = destinations.find((d) => d.id === destinationId) || null;
+  const destinationName = destination?.name || '';
+  const availableOffers = offersByType[type] || [];
 
   const offersTemplate = availableOffers.length ? `
     <section class='event__section event__section--offers'>
       <h3 class='event__section-title event__section-title--offers'>Offers</h3>
       <div class='event__available-offers'>
-        ${availableOffers.map((offer) => `
-          <div class='event__offer-selector'>
-            <input class='event__offer-checkbox visually-hidden'
-                   id='offer-${offer.id}'
-                   type='checkbox'
-                   name='offer'
-                   value='${offer.id}'>
-            <label class='event__offer-label' for='offer-${offer.id}'>
-              <span class='event__offer-title'>${offer.title}</span>
-              &plus;&euro;&nbsp;
-              <span class='event__offer-price'>${offer.price}</span>
-            </label>
-          </div>
-        `).join('')}
+        ${availableOffers.map((offer) => {
+    const isChecked = offers.includes(offer.id);
+    return `
+            <div class='event__offer-selector'>
+              <input class='event__offer-checkbox visually-hidden'
+                     id='offer-${offer.id}'
+                     type='checkbox'
+                     name='offer'
+                     value='${offer.id}'
+                     ${isChecked ? 'checked' : ''}>
+              <label class='event__offer-label' for='offer-${offer.id}'>
+                <span class='event__offer-title'>${offer.title}</span>
+                &plus;&euro;&nbsp;
+                <span class='event__offer-price'>${offer.price}</span>
+              </label>
+            </div>
+          `;
+  }).join('')}
       </div>
+    </section>
+  ` : '';
+
+  const destinationTemplate = (destination?.description || destination?.pictures?.length) ? `
+    <section class='event__section event__section--destination'>
+      <h3 class='event__section-title event__section-title--destination'>Destination</h3>
+      ${destination.description ? `<p class='event__destination-description'>${destination.description}</p>` : ''}
+      ${destination.pictures?.length ? `
+        <div class='event__photos-container'>
+          <div class='event__photos-tape'>
+            ${destination.pictures.map((pic) => `
+              <img class='event__photo' src='${pic}' alt='${destination.name} photo'>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
     </section>
   ` : '';
 
@@ -34,7 +83,7 @@ function createFormCreateTemplate(defaultType = 'flight', destinations = [], ava
           <div class='event__type-wrapper'>
             <label class='event__type event__type-btn' for='event-type-toggle-1'>
               <span class='visually-hidden'>Choose event type</span>
-              <img class='event__type-icon' width='17' height='17' src='img/icons/${defaultType}.png' alt='Event type icon'>
+              <img class='event__type-icon' width='17' height='17' src='img/icons/${type}.png' alt='Event type icon'>
             </label>
             <input class='event__type-toggle visually-hidden' id='event-type-toggle-1' type='checkbox'>
             <div class='event__type-list'>
@@ -54,17 +103,17 @@ function createFormCreateTemplate(defaultType = 'flight', destinations = [], ava
           </div>
           <div class='event__field-group event__field-group--destination'>
             <label class='event__label event__type-output' for='event-destination-1'>
-              ${defaultType} to
+              ${type} to
             </label>
             <input class='event__input event__input--destination'
                    id='event-destination-1'
                    type='text'
                    name='event-destination'
-                   value=''
+                   value='${destinationName}'
                    list='destination-list-1'
                    required>
             <datalist id='destination-list-1'>
-              ${destinationOptions}
+              ${destinations.map((d) => `<option value='${d.name}'></option>`).join('')}
             </datalist>
           </div>
           <div class='event__field-group event__field-group--time'>
@@ -73,7 +122,7 @@ function createFormCreateTemplate(defaultType = 'flight', destinations = [], ava
                    id='event-start-time-1'
                    type='text'
                    name='event-start-time'
-                   value=''
+                   value='${dateFrom ? formatDateForInput(dateFrom) : ''}'
                    placeholder='19/03/19 00:00'
                    required>
             &mdash;
@@ -82,7 +131,7 @@ function createFormCreateTemplate(defaultType = 'flight', destinations = [], ava
                    id='event-end-time-1'
                    type='text'
                    name='event-end-time'
-                   value=''
+                   value='${dateTo ? formatDateForInput(dateTo) : ''}'
                    placeholder='19/03/19 00:00'
                    required>
           </div>
@@ -92,48 +141,140 @@ function createFormCreateTemplate(defaultType = 'flight', destinations = [], ava
                    id='event-price-1'
                    type='number'
                    name='event-price'
-                   value='0'
+                   value='${basePrice}'
                    min='0'
                    required>
           </div>
           <button class='event__save-btn btn btn--blue' type='submit'>Save</button>
           <button class='event__reset-btn' type='reset'>Cancel</button>
         </header>
-        ${offersTemplate ? `<section class='event__details'>${offersTemplate}</section>` : ''}
+        ${(offersTemplate || destinationTemplate) ? `
+          <section class='event__details'>
+            ${offersTemplate}
+            ${destinationTemplate}
+          </section>
+        ` : ''}
       </form>
     </li>
   `;
 }
 
-export default class FormCreateView extends AbstractView {
-  #defaultType = null;
+export default class FormCreateView extends AbstractStatefulView {
   #destinations = null;
-  #availableOffers = null;
+  #offersByType = null;
   #onFormSubmit = null;
   #onFormClose = null;
+  #onTypeChange = null;
+  #onDestinationChange = null;
 
-  constructor({defaultType = 'flight', destinations, availableOffers, onFormSubmit, onFormClose}) {
+  constructor({defaultType = 'flight', destinations, offersByType, onFormSubmit, onFormClose, onTypeChange, onDestinationChange}) {
     super();
-    this.#defaultType = defaultType;
+    this._setState({
+      type: defaultType,
+      basePrice: 0,
+      dateFrom: null,
+      dateTo: null,
+      destinationId: null,
+      offers: []
+    });
     this.#destinations = destinations;
-    this.#availableOffers = availableOffers;
+    this.#offersByType = offersByType;
     this.#onFormSubmit = onFormSubmit;
     this.#onFormClose = onFormClose;
-    this.element.querySelector('form').addEventListener('submit', this.#formSubmitHandler);
-    this.element.querySelector('.event__reset-btn').addEventListener('click', this.#formCloseHandler);
+    this.#onTypeChange = onTypeChange;
+    this.#onDestinationChange = onDestinationChange;
+    this._restoreHandlers();
   }
 
   get template() {
-    return createFormCreateTemplate(this.#defaultType, this.#destinations, this.#availableOffers);
+    return createFormCreateTemplate(this._state, this.#destinations, this.#offersByType);
   }
 
-  #formSubmitHandler = (evt) => {
-    evt.preventDefault();
-    this.#onFormSubmit();
-  };
+  _restoreHandlers() {
+    this.element.querySelector('form').addEventListener('submit', (evt) => this.#formSubmitHandler(evt));
+    this.element.querySelector('.event__reset-btn').addEventListener('click', (evt) => this.#formCloseHandler(evt));
 
-  #formCloseHandler = (evt) => {
+    this.element.querySelectorAll('.event__type-item--btn').forEach((btn) => {
+      btn.addEventListener('click', (evt) => this.#typeChangeHandler(evt));
+    });
+
+    this.element.querySelector('.event__input--destination').addEventListener('change', (evt) => this.#destinationChangeHandler(evt));
+
+    this.element.querySelectorAll('.event__offer-checkbox').forEach((checkbox) => {
+      checkbox.addEventListener('change', (evt) => this.#offerChangeHandler(evt));
+    });
+
+    this.element.querySelectorAll('.event__input--time').forEach((input) => {
+      input.addEventListener('change', (evt) => this.#timeChangeHandler(evt));
+    });
+  }
+
+  #formSubmitHandler(evt) {
+    evt.preventDefault();
+    this.#onFormSubmit(this._state);
+  }
+
+  #formCloseHandler(evt) {
     evt.preventDefault();
     this.#onFormClose();
-  };
+  }
+
+  #typeChangeHandler(evt) {
+    evt.preventDefault();
+    const newType = evt.target.dataset.type;
+    if (!newType) {
+      return;
+    }
+    this.#onTypeChange(newType);
+    this.updateElement({
+      ...this._state,
+      type: newType,
+      offers: []
+    });
+  }
+
+  #destinationChangeHandler(evt) {
+    const newDestinationName = evt.target.value;
+    const destination = this.#destinations.find((d) => d.name === newDestinationName);
+    if (!destination) {
+      return;
+    }
+    this.#onDestinationChange(destination.id);
+    this.updateElement({
+      ...this._state,
+      destinationId: destination.id
+    });
+  }
+
+  #offerChangeHandler(evt) {
+    const offerId = evt.target.value;
+    const currentOffers = [...this._state.offers];
+    const index = currentOffers.indexOf(offerId);
+    if (index === -1) {
+      currentOffers.push(offerId);
+    } else {
+      currentOffers.splice(index, 1);
+    }
+    this.updateElement({
+      ...this._state,
+      offers: currentOffers
+    });
+  }
+
+  #timeChangeHandler(evt) {
+    const name = evt.target.name;
+    const value = evt.target.value;
+
+    if (name === 'event-start-time') {
+      this.updateElement({
+        ...this._state,
+        dateFrom: value ? parseDateInput(value) : null
+      });
+    } else if (name === 'event-end-time') {
+      this.updateElement({
+        ...this._state,
+        dateTo: value ? parseDateInput(value) : null
+      });
+    }
+  }
 }

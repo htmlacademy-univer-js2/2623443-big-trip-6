@@ -1,4 +1,4 @@
-import AbstractView from '../framework/view/abstract-view.js';
+import AbstractStatefulView from '../framework/view/abstract-stateful-view.js';
 
 function formatDateForInput(dateString) {
   if (!dateString) {
@@ -13,16 +13,33 @@ function formatDateForInput(dateString) {
   return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
 
-function createFormEditTemplate(point, destination, availableOffers, selectedOfferIds = []) {
-  const { type, basePrice, dateFrom, dateTo } = point;
+function parseDateInput(value) {
+  if (!value) {
+    return null;
+  }
+  const [datePart, timePart] = value.split(' ');
+  if (!datePart || !timePart) {
+    return null;
+  }
+  const [day, month, year] = datePart.split('/');
+  const [hours, minutes] = timePart.split(':');
+  const fullYear = `20${year}`;
+  const date = new Date(Date.UTC(fullYear, month - 1, day, hours, minutes));
+  return date.toISOString();
+}
+
+function createFormEditTemplate(state, destinations, offersByType) {
+  const { type, basePrice, dateFrom, dateTo, destinationId, offers } = state;
+  const destination = destinations.find((d) => d.id === destinationId) || null;
   const destinationName = destination?.name || '';
+  const availableOffers = offersByType[type] || [];
 
   const offersTemplate = availableOffers.length ? `
     <section class='event__section event__section--offers'>
       <h3 class='event__section-title event__section-title--offers'>Offers</h3>
       <div class='event__available-offers'>
         ${availableOffers.map((offer) => {
-    const isChecked = selectedOfferIds.includes(offer.id);
+    const isChecked = offers.includes(offer.id);
     return `
             <div class='event__offer-selector'>
               <input class='event__offer-checkbox visually-hidden'
@@ -96,7 +113,7 @@ function createFormEditTemplate(point, destination, availableOffers, selectedOff
                    list='destination-list-1'
                    required>
             <datalist id='destination-list-1'>
-              ${destinationName ? `<option value='${destinationName}'></option>` : ''}
+              ${destinations.map((d) => `<option value='${d.name}'></option>`).join('')}
             </datalist>
           </div>
           <div class='event__field-group event__field-group--time'>
@@ -145,43 +162,124 @@ function createFormEditTemplate(point, destination, availableOffers, selectedOff
   `;
 }
 
-export default class FormEditView extends AbstractView {
-  #point = null;
-  #destination = null;
-  #availableOffers = null;
-  #selectedOfferIds = null;
+export default class FormEditView extends AbstractStatefulView {
+  #destinations = null;
+  #offersByType = null;
   #onFormSubmit = null;
   #onFormClose = null;
+  #onTypeChange = null;
+  #onDestinationChange = null;
 
-  constructor({point, destination, availableOffers, selectedOfferIds, onFormSubmit, onFormClose}) {
+  constructor({point, destinations, offersByType, onFormSubmit, onFormClose, onTypeChange, onDestinationChange}) {
     super();
-    this.#point = point;
-    this.#destination = destination;
-    this.#availableOffers = availableOffers;
-    this.#selectedOfferIds = selectedOfferIds;
+    this._setState({
+      id: point.id,
+      type: point.type,
+      basePrice: point.basePrice,
+      dateFrom: point.dateFrom,
+      dateTo: point.dateTo,
+      destinationId: point.destinationId,
+      offers: [...point.offersIds]
+    });
+    this.#destinations = destinations;
+    this.#offersByType = offersByType;
     this.#onFormSubmit = onFormSubmit;
     this.#onFormClose = onFormClose;
-    this.element.querySelector('form').addEventListener('submit', this.#formSubmitHandler);
-    this.element.querySelector('.event__rollup-btn').addEventListener('click', this.#formCloseHandler);
-    this.element.querySelector('.event__reset-btn').addEventListener('click', this.#formCloseHandler);
+    this.#onTypeChange = onTypeChange;
+    this.#onDestinationChange = onDestinationChange;
+    this._restoreHandlers();
   }
 
   get template() {
-    return createFormEditTemplate(
-      this.#point,
-      this.#destination,
-      this.#availableOffers,
-      this.#selectedOfferIds
-    );
+    return createFormEditTemplate(this._state, this.#destinations, this.#offersByType);
   }
 
-  #formSubmitHandler = (evt) => {
-    evt.preventDefault();
-    this.#onFormSubmit();
-  };
+  _restoreHandlers() {
+    this.element.querySelector('form').addEventListener('submit', (evt) => this.#formSubmitHandler(evt));
+    this.element.querySelector('.event__rollup-btn').addEventListener('click', (evt) => this.#formCloseHandler(evt));
+    this.element.querySelector('.event__reset-btn').addEventListener('click', (evt) => this.#formCloseHandler(evt));
 
-  #formCloseHandler = (evt) => {
+    this.element.querySelectorAll('.event__type-item--btn').forEach((btn) => {
+      btn.addEventListener('click', (evt) => this.#typeChangeHandler(evt));
+    });
+
+    this.element.querySelector('.event__input--destination').addEventListener('change', (evt) => this.#destinationChangeHandler(evt));
+
+    this.element.querySelectorAll('.event__offer-checkbox').forEach((checkbox) => {
+      checkbox.addEventListener('change', (evt) => this.#offerChangeHandler(evt));
+    });
+
+    this.element.querySelectorAll('.event__input--time').forEach((input) => {
+      input.addEventListener('change', (evt) => this.#timeChangeHandler(evt));
+    });
+  }
+
+  #formSubmitHandler(evt) {
+    evt.preventDefault();
+    this.#onFormSubmit(this._state);
+  }
+
+  #formCloseHandler(evt) {
     evt.preventDefault();
     this.#onFormClose();
-  };
+  }
+
+  #typeChangeHandler(evt) {
+    evt.preventDefault();
+    const newType = evt.target.dataset.type;
+    if (!newType) {
+      return;
+    }
+    this.#onTypeChange(newType);
+    this.updateElement({
+      ...this._state,
+      type: newType,
+      offers: []
+    });
+  }
+
+  #destinationChangeHandler(evt) {
+    const newDestinationName = evt.target.value;
+    const destination = this.#destinations.find((d) => d.name === newDestinationName);
+    if (!destination) {
+      return;
+    }
+    this.#onDestinationChange(destination.id);
+    this.updateElement({
+      ...this._state,
+      destinationId: destination.id
+    });
+  }
+
+  #offerChangeHandler(evt) {
+    const offerId = evt.target.value;
+    const currentOffers = [...this._state.offers];
+    const index = currentOffers.indexOf(offerId);
+    if (index === -1) {
+      currentOffers.push(offerId);
+    } else {
+      currentOffers.splice(index, 1);
+    }
+    this.updateElement({
+      ...this._state,
+      offers: currentOffers
+    });
+  }
+
+  #timeChangeHandler(evt) {
+    const name = evt.target.name;
+    const value = evt.target.value;
+
+    if (name === 'event-start-time') {
+      this.updateElement({
+        ...this._state,
+        dateFrom: value ? parseDateInput(value) : null
+      });
+    } else if (name === 'event-end-time') {
+      this.updateElement({
+        ...this._state,
+        dateTo: value ? parseDateInput(value) : null
+      });
+    }
+  }
 }
