@@ -149,12 +149,11 @@ export default class FormEditView extends AbstractStatefulView {
   #offersByType = null;
   #onFormSubmit = null;
   #onFormClose = null;
-  #onTypeChange = null;
-  #onDestinationChange = null;
+  #onDeleteClick = null;
   #datepickerStart = null;
   #datepickerEnd = null;
 
-  constructor({point, destinations, offersByType, onFormSubmit, onFormClose, onTypeChange, onDestinationChange}) {
+  constructor({point, destinations, offersByType, onFormSubmit, onFormClose, onDeleteClick}) {
     super();
     this._setState({
       id: point.id,
@@ -169,8 +168,7 @@ export default class FormEditView extends AbstractStatefulView {
     this.#offersByType = offersByType;
     this.#onFormSubmit = onFormSubmit;
     this.#onFormClose = onFormClose;
-    this.#onTypeChange = onTypeChange;
-    this.#onDestinationChange = onDestinationChange;
+    this.#onDeleteClick = onDeleteClick;
     this._restoreHandlers();
   }
 
@@ -181,7 +179,7 @@ export default class FormEditView extends AbstractStatefulView {
   _restoreHandlers() {
     this.element.querySelector('form').addEventListener('submit', (evt) => this.#formSubmitHandler(evt));
     this.element.querySelector('.event__rollup-btn').addEventListener('click', (evt) => this.#formCloseHandler(evt));
-    this.element.querySelector('.event__reset-btn').addEventListener('click', (evt) => this.#formCloseHandler(evt));
+    this.element.querySelector('.event__reset-btn').addEventListener('click', (evt) => this.#deleteClickHandler(evt));
 
     this.element.querySelectorAll('.event__type-item--btn').forEach((btn) => {
       btn.addEventListener('click', (evt) => this.#typeChangeHandler(evt));
@@ -191,6 +189,13 @@ export default class FormEditView extends AbstractStatefulView {
 
     this.element.querySelectorAll('.event__offer-checkbox').forEach((checkbox) => {
       checkbox.addEventListener('change', (evt) => this.#offerChangeHandler(evt));
+    });
+
+    this.element.querySelector('.event__input--price').addEventListener('input', (evt) => {
+      evt.target.value = evt.target.value.replace(/[^0-9]/g, '');
+    });
+    this.element.querySelector('.event__input--price').addEventListener('change', (evt) => {
+      this._setState({ ...this._state, basePrice: Number(evt.target.value) || 0 });
     });
 
     const startTimeElement = this.element.querySelector('[name="event-start-time"]');
@@ -233,13 +238,17 @@ export default class FormEditView extends AbstractStatefulView {
     this.#onFormClose();
   }
 
+  #deleteClickHandler(evt) {
+    evt.preventDefault();
+    this.#onDeleteClick();
+  }
+
   #typeChangeHandler(evt) {
     evt.preventDefault();
     const newType = evt.target.dataset.type;
     if (!newType) {
       return;
     }
-    this.#onTypeChange(newType);
     this.updateElement({
       ...this._state,
       type: newType,
@@ -253,7 +262,6 @@ export default class FormEditView extends AbstractStatefulView {
     if (!destination) {
       return;
     }
-    this.#onDestinationChange(destination.id);
     this.updateElement({
       ...this._state,
       destinationId: destination.id
