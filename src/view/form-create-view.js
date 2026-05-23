@@ -1,4 +1,6 @@
 import AbstractStatefulView from '../framework/view/abstract-stateful-view.js';
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/flatpickr.min.css';
 
 function formatDateForInput(dateString) {
   if (!dateString) {
@@ -11,21 +13,6 @@ function formatDateForInput(dateString) {
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${day}/${month}/${year} ${hours}:${minutes}`;
-}
-
-function parseDateInput(value) {
-  if (!value) {
-    return null;
-  }
-  const [datePart, timePart] = value.split(' ');
-  if (!datePart || !timePart) {
-    return null;
-  }
-  const [day, month, year] = datePart.split('/');
-  const [hours, minutes] = timePart.split(':');
-  const fullYear = `20${year}`;
-  const date = new Date(Date.UTC(fullYear, month - 1, day, hours, minutes));
-  return date.toISOString();
 }
 
 function createFormCreateTemplate(state, destinations, offersByType) {
@@ -166,6 +153,8 @@ export default class FormCreateView extends AbstractStatefulView {
   #onFormClose = null;
   #onTypeChange = null;
   #onDestinationChange = null;
+  #datepickerStart = null;
+  #datepickerEnd = null;
 
   constructor({defaultType = 'flight', destinations, offersByType, onFormSubmit, onFormClose, onTypeChange, onDestinationChange}) {
     super();
@@ -204,8 +193,33 @@ export default class FormCreateView extends AbstractStatefulView {
       checkbox.addEventListener('change', (evt) => this.#offerChangeHandler(evt));
     });
 
-    this.element.querySelectorAll('.event__input--time').forEach((input) => {
-      input.addEventListener('change', (evt) => this.#timeChangeHandler(evt));
+    const startTimeElement = this.element.querySelector('[name="event-start-time"]');
+    const endTimeElement = this.element.querySelector('[name="event-end-time"]');
+
+    if (this.#datepickerStart) {
+      this.#datepickerStart.destroy();
+    }
+    if (this.#datepickerEnd) {
+      this.#datepickerEnd.destroy();
+    }
+
+    this.#datepickerStart = flatpickr(startTimeElement, {
+      dateFormat: 'd/m/y H:i',
+      enableTime: true,
+      locale: { firstDayOfWeek: 1 },
+      'time_24hr': true,
+      defaultDate: this._state.dateFrom ? new Date(this._state.dateFrom) : null,
+      onChange: this.#dateChangeHandler('dateFrom')
+    });
+
+    this.#datepickerEnd = flatpickr(endTimeElement, {
+      dateFormat: 'd/m/y H:i',
+      enableTime: true,
+      locale: { firstDayOfWeek: 1 },
+      'time_24hr': true,
+      defaultDate: this._state.dateTo ? new Date(this._state.dateTo) : null,
+      minDate: this._state.dateFrom ? new Date(this._state.dateFrom) : null,
+      onChange: this.#dateChangeHandler('dateTo')
     });
   }
 
@@ -261,20 +275,13 @@ export default class FormCreateView extends AbstractStatefulView {
     });
   }
 
-  #timeChangeHandler(evt) {
-    const name = evt.target.name;
-    const value = evt.target.value;
-
-    if (name === 'event-start-time') {
-      this.updateElement({
-        ...this._state,
-        dateFrom: value ? parseDateInput(value) : null
-      });
-    } else if (name === 'event-end-time') {
-      this.updateElement({
-        ...this._state,
-        dateTo: value ? parseDateInput(value) : null
-      });
+  #dateChangeHandler = (key) => ([selectedDate]) => {
+    this._setState({
+      ...this._state,
+      [key]: selectedDate.toISOString()
+    });
+    if (key === 'dateFrom') {
+      this.#datepickerEnd.set('minDate', this._state.dateFrom);
     }
-  }
+  };
 }

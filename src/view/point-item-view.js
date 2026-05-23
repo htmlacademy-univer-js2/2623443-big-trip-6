@@ -1,15 +1,18 @@
 import AbstractView from '../framework/view/abstract-view.js';
+import dayjs from 'dayjs';
 
 function createPointItemTemplate(point, destination, offersList) {
   const { type, basePrice, dateFrom, dateTo, isFavorite } = point;
-  const date = new Date(dateFrom);
-  const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-  const day = date.getDate();
+  const date = dayjs(dateFrom);
+  const month = date.format('MMM').toUpperCase();
+  const day = date.format('DD');
   const formattedDate = `${month} ${day}`;
-  const startTime = new Date(dateFrom).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const endTime = new Date(dateTo).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const durationMs = new Date(dateTo) - new Date(dateFrom);
+  const startTime = date.format('HH:mm');
+  const endTime = dayjs(dateTo).format('HH:mm');
+
+  const durationMs = dayjs(dateTo).diff(dateFrom);
   const durationMinutes = Math.floor(durationMs / 60000);
+
   let durationStr = '';
   if (durationMinutes < 60) {
     durationStr = `${durationMinutes}M`;
@@ -18,6 +21,7 @@ function createPointItemTemplate(point, destination, offersList) {
   } else {
     durationStr = `${Math.floor(durationMinutes / 1440)}D ${Math.floor((durationMinutes % 1440) / 60)}H ${durationMinutes % 60}M`;
   }
+
   const typeIcon = `img/icons/${type}.png`;
   const destinationName = destination ? destination.name : '';
   const offersHtml = offersList.map((offer) => `
@@ -80,7 +84,6 @@ export default class PointItemView extends AbstractView {
     this.#offersList = offersList;
     this.#onEditClick = onEditClick;
     this.#onFavoriteClick = onFavoriteClick;
-
     this.element.querySelector('.event__rollup-btn').addEventListener('click', this.#editClickHandler);
     this.element.querySelector('.event__favorite-btn').addEventListener('click', this.#favoriteClickHandler);
   }
