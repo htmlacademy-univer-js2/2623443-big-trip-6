@@ -1,13 +1,20 @@
-export const adaptPointToServer = (point) => ({
-  id: point.id,
-  ['base_price']: point.basePrice,
-  ['date_from']: point.dateFrom,
-  ['date_to']: point.dateTo,
-  ['destination']: point.destinationId,
-  ['is_favorite']: point.isFavorite,
-  ['offers']: point.offersIds,
-  ['type']: point.type,
-});
+export const adaptPointToServer = (point, forUpdate = true) => {
+  const payload = {
+    ['base_price']: point.basePrice,
+    ['date_from']: point.dateFrom,
+    ['date_to']: point.dateTo,
+    ['destination']: point.destinationId,
+    ['is_favorite']: point.isFavorite,
+    ['offers']: point.offersIds,
+    ['type']: point.type,
+  };
+
+  if (forUpdate && point.id) {
+    payload.id = point.id;
+  }
+
+  return payload;
+};
 
 export const adaptPointToClient = (point) => ({
   id: point.id,

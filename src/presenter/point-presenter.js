@@ -2,6 +2,8 @@ import PointItemView from '../view/point-item-view.js';
 import FormEditView from '../view/form-edit-view.js';
 import { render, replace, remove } from '../framework/render.js';
 import { UpdateType } from '../const.js';
+import { updatePoint as apiUpdatePoint, deletePoint as apiDeletePoint } from '../api/api-service.js';
+import { adaptPointToServer, adaptPointToClient } from '../api/adapter.js';
 
 export default class PointPresenter {
   #listComponent = null;
@@ -94,16 +96,38 @@ export default class PointPresenter {
     this.resetView();
   }
 
-  #handleFormSubmit(updatedState) {
+  async #handleFormSubmit(updatedState) {
     const { offers, ...pointData } = updatedState;
-    const updatedPoint = {
-      ...this.#point,
-      ...pointData,
-      offersIds: offers
-    };
-    this.#point = updatedPoint;
-    this.#onDataChange(UpdateType.PATCH, updatedPoint);
-    this.resetView();
+    const pointToSave = { ...this.#point, ...pointData, offersIds: offers };
+    this.#formEditComponent.setSaving();
+
+    try {
+      const serverPoint = adaptPointToServer(pointToSave, true);
+      const response = await apiUpdatePoint(serverPoint);
+
+      let adaptedPoint;
+      if (response) {
+        adaptedPoint = adaptPointToClient(response);
+      } else {
+        adaptedPoint = pointToSave;
+      }
+
+      this.#point = adaptedPoint;
+      this.resetView();
+      this.#onDataChange(UpdateType.PATCH, adaptedPoint);
+    } catch (error) {
+      this.#formEditComponent.setSaveError();
+    }
+  }
+
+  async #handleDeleteClick() {
+    this.#formEditComponent.setDeleting();
+    try {
+      await apiDeletePoint(this.#point.id);
+      this.#onDataChange(UpdateType.DELETE, this.#point);
+    } catch (error) {
+      this.#formEditComponent.setDeleteError();
+    }
   }
 
   #handleFavoriteClick() {
@@ -112,9 +136,5 @@ export default class PointPresenter {
       isFavorite: !this.#point.isFavorite
     };
     this.#onDataChange(UpdateType.PATCH, updatedPoint);
-  }
-
-  #handleDeleteClick() {
-    this.#onDataChange(UpdateType.DELETE, this.#point);
   }
 }
