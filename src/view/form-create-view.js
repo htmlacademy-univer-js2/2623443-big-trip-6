@@ -226,6 +226,28 @@ export default class FormCreateView extends AbstractStatefulView {
     });
   }
 
+  setSaving() {
+    this.element.querySelector('.event__save-btn').textContent = 'Saving...';
+    this.#setDisabled(true);
+  }
+
+  setSaveError() {
+    this.#setDisabled(false);
+    this.element.querySelector('.event__save-btn').textContent = 'Save';
+    this.#shake();
+  }
+
+  #setDisabled(isDisabled) {
+    this.element.querySelectorAll('input, select, button').forEach((el) => {
+      el.disabled = isDisabled;
+    });
+  }
+
+  #shake() {
+    this.element.classList.add('shake');
+    setTimeout(() => this.element.classList.remove('shake'), 600);
+  }
+
   #formSubmitHandler(evt) {
     evt.preventDefault();
     this.#onFormSubmit(this._state);

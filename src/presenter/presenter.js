@@ -6,6 +6,8 @@ import ErrorView from '../view/error-view.js';
 import PointPresenter from './point-presenter.js';
 import { render, remove } from '../framework/render.js';
 import { UpdateType, FilterType } from '../const.js';
+import { createPoint as apiCreatePoint } from '../api/api-service.js';
+import { adaptPointToServer, adaptPointToClient } from '../api/adapter.js';
 import dayjs from 'dayjs';
 
 const sortPointsByDate = (pointA, pointB) => dayjs(pointA.dateFrom).diff(dayjs(pointB.dateFrom));
@@ -189,9 +191,15 @@ export default class Presenter {
     render(this.#formCreateComponent, this.#listComponent, 'afterbegin');
   }
 
-  #handleFormCreateSubmit(state) {
+  async #handleFormCreateSubmit(state) {
+    if (!state.dateFrom || !state.dateTo || !state.destinationId || !state.basePrice) {
+      this.#formCreateComponent.setSaveError();
+      return;
+    }
+
+    this.#formCreateComponent.setSaving();
+
     const newPoint = {
-      id: crypto.randomUUID(),
       basePrice: Number(state.basePrice),
       dateFrom: state.dateFrom,
       dateTo: state.dateTo,
@@ -200,10 +208,23 @@ export default class Presenter {
       offersIds: state.offers,
       type: state.type
     };
-    this.#pointsModel.addPoint(newPoint);
-    this.#filterPresenter?.update();
-    this.#removeFormCreate();
-    this.#renderPoints();
+
+    try {
+      const serverPayload = adaptPointToServer(newPoint, false);
+      const response = await apiCreatePoint(serverPayload);
+
+      if (!response || !response.id) {
+        throw new Error('Invalid server response');
+      }
+
+      const adaptedPoint = adaptPointToClient(response);
+      this.#pointsModel.addPoint(adaptedPoint);
+      this.#filterPresenter?.update();
+      this.#removeFormCreate();
+      this.#renderPoints();
+    } catch (error) {
+      this.#formCreateComponent.setSaveError();
+    }
   }
 
   #removeFormCreate() {
@@ -216,14 +237,10 @@ export default class Presenter {
   #handleViewAction = async (updateType, update) => {
     switch (updateType) {
       case UpdateType.PATCH: {
-        try {
-          const updated = await this.#pointsModel.updatePointOnServer(update);
-          this.#pointsModel.updatePoint(updated);
-          const pointPresenter = this.#pointPresenters.get(updated.id);
-          if (pointPresenter) {
-            pointPresenter.updatePoint(updated);
-          }
-        } catch (error) { //
+        this.#pointsModel.updatePoint(update);
+        const pointPresenter = this.#pointPresenters.get(update.id);
+        if (pointPresenter) {
+          pointPresenter.updatePoint(update);
         }
         break;
       }

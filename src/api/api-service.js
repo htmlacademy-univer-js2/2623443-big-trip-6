@@ -5,16 +5,18 @@ const ENDPOINTS = {
   OFFERS: '/offers',
 };
 
-const generateAuthToken = () => {
+const AUTH_TOKEN_KEY = 'big-trip-auth-token';
+let AUTH_TOKEN = localStorage.getItem(AUTH_TOKEN_KEY);
+
+if (!AUTH_TOKEN) {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
   for (let i = 0; i < 16; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return `Basic ${result}`;
-};
-
-const AUTH_TOKEN = generateAuthToken();
+  AUTH_TOKEN = `Basic ${result}`;
+  localStorage.setItem(AUTH_TOKEN_KEY, AUTH_TOKEN);
+}
 
 const load = async (route, method = 'GET', body = null) => {
   const url = `${BASE_URL}${route}`;
@@ -32,6 +34,11 @@ const load = async (route, method = 'GET', body = null) => {
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
   }
+
+  if (response.status === 204) {
+    return null;
+  }
+
   return await response.json();
 };
 
@@ -39,3 +46,5 @@ export const fetchPoints = () => load(ENDPOINTS.POINTS);
 export const fetchDestinations = () => load(ENDPOINTS.DESTINATIONS);
 export const fetchOffers = () => load(ENDPOINTS.OFFERS);
 export const updatePoint = (point) => load(`${ENDPOINTS.POINTS}/${point.id}`, 'PUT', point);
+export const createPoint = (point) => load(ENDPOINTS.POINTS, 'POST', point);
+export const deletePoint = (id) => load(`${ENDPOINTS.POINTS}/${id}`, 'DELETE');
