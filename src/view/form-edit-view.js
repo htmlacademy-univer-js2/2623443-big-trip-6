@@ -1,31 +1,13 @@
 import AbstractStatefulView from '../framework/view/abstract-stateful-view.js';
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/flatpickr.min.css';
+import dayjs from 'dayjs';
 
 function formatDateForInput(dateString) {
   if (!dateString) {
     return '';
   }
-  const date = new Date(dateString);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = String(date.getFullYear()).slice(-2);
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
-}
-
-function parseDateInput(value) {
-  if (!value) {
-    return null;
-  }
-  const [datePart, timePart] = value.split(' ');
-  if (!datePart || !timePart) {
-    return null;
-  }
-  const [day, month, year] = datePart.split('/');
-  const [hours, minutes] = timePart.split(':');
-  const fullYear = `20${year}`;
-  const date = new Date(Date.UTC(fullYear, month - 1, day, hours, minutes));
-  return date.toISOString();
+  return dayjs(dateString).format('DD/MM/YY HH:mm');
 }
 
 function createFormEditTemplate(state, destinations, offersByType) {
@@ -122,7 +104,7 @@ function createFormEditTemplate(state, destinations, offersByType) {
                    id='event-start-time-1'
                    type='text'
                    name='event-start-time'
-                   value='${formatDateForInput(dateFrom)}'
+                   value='${dateFrom ? formatDateForInput(dateFrom) : ''}'
                    placeholder='19/03/19 00:00'
                    required>
             &mdash;
@@ -131,7 +113,7 @@ function createFormEditTemplate(state, destinations, offersByType) {
                    id='event-end-time-1'
                    type='text'
                    name='event-end-time'
-                   value='${formatDateForInput(dateTo)}'
+                   value='${dateTo ? formatDateForInput(dateTo) : ''}'
                    placeholder='19/03/19 00:00'
                    required>
           </div>
@@ -169,6 +151,8 @@ export default class FormEditView extends AbstractStatefulView {
   #onFormClose = null;
   #onTypeChange = null;
   #onDestinationChange = null;
+  #datepickerStart = null;
+  #datepickerEnd = null;
 
   constructor({point, destinations, offersByType, onFormSubmit, onFormClose, onTypeChange, onDestinationChange}) {
     super();
@@ -209,8 +193,33 @@ export default class FormEditView extends AbstractStatefulView {
       checkbox.addEventListener('change', (evt) => this.#offerChangeHandler(evt));
     });
 
-    this.element.querySelectorAll('.event__input--time').forEach((input) => {
-      input.addEventListener('change', (evt) => this.#timeChangeHandler(evt));
+    const startTimeElement = this.element.querySelector('[name="event-start-time"]');
+    const endTimeElement = this.element.querySelector('[name="event-end-time"]');
+
+    if (this.#datepickerStart) {
+      this.#datepickerStart.destroy();
+    }
+    if (this.#datepickerEnd) {
+      this.#datepickerEnd.destroy();
+    }
+
+    this.#datepickerStart = flatpickr(startTimeElement, {
+      dateFormat: 'd/m/y H:i',
+      enableTime: true,
+      locale: { firstDayOfWeek: 1 },
+      'time_24hr': true,
+      defaultDate: this._state.dateFrom ? new Date(this._state.dateFrom) : null,
+      onChange: this.#dateChangeHandler('dateFrom')
+    });
+
+    this.#datepickerEnd = flatpickr(endTimeElement, {
+      dateFormat: 'd/m/y H:i',
+      enableTime: true,
+      locale: { firstDayOfWeek: 1 },
+      'time_24hr': true,
+      defaultDate: this._state.dateTo ? new Date(this._state.dateTo) : null,
+      minDate: this._state.dateFrom ? new Date(this._state.dateFrom) : null,
+      onChange: this.#dateChangeHandler('dateTo')
     });
   }
 
@@ -266,20 +275,13 @@ export default class FormEditView extends AbstractStatefulView {
     });
   }
 
-  #timeChangeHandler(evt) {
-    const name = evt.target.name;
-    const value = evt.target.value;
-
-    if (name === 'event-start-time') {
-      this.updateElement({
-        ...this._state,
-        dateFrom: value ? parseDateInput(value) : null
-      });
-    } else if (name === 'event-end-time') {
-      this.updateElement({
-        ...this._state,
-        dateTo: value ? parseDateInput(value) : null
-      });
+  #dateChangeHandler = (key) => ([selectedDate]) => {
+    this._setState({
+      ...this._state,
+      [key]: selectedDate.toISOString()
+    });
+    if (key === 'dateFrom') {
+      this.#datepickerEnd.set('minDate', this._state.dateFrom);
     }
-  }
+  };
 }
