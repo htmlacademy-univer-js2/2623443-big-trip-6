@@ -3,7 +3,6 @@ import SortView from '../view/sort-view.js';
 import FormCreateView from '../view/form-create-view.js';
 import NoPointsView from '../view/no-points-view.js';
 import PointPresenter from './point-presenter.js';
-//import PointsModel from '../model/points-model.js';
 import { render, remove } from '../framework/render.js';
 
 const sortPointsByDate = (pointA, pointB) => new Date(pointA.dateFrom) - new Date(pointB.dateFrom);
@@ -37,6 +36,7 @@ export default class Presenter {
     this.#renderSort();
     this.#renderPoints();
     this.#setNewEventButtonListener();
+    document.addEventListener('keydown', this.#escKeyDownHandler);
   }
 
   #renderFilters() {
@@ -132,18 +132,24 @@ export default class Presenter {
 
   #renderFormCreate() {
     const destinations = this.#pointsModel.getDestinations();
+    const offersByType = this.#pointsModel.getAllOffers();
     const defaultType = 'flight';
-    const availableOffers = this.#pointsModel.getOffersByType(defaultType);
 
     this.#formCreateComponent = new FormCreateView({
       defaultType,
       destinations,
-      availableOffers,
-      onFormSubmit: () => {},
-      onFormClose: () => this.#removeFormCreate()
+      offersByType,
+      onFormSubmit: (state) => this.#handleFormCreateSubmit(state),
+      onFormClose: () => this.#removeFormCreate(),
+      onTypeChange: () => {},
+      onDestinationChange: () => {}
     });
 
     render(this.#formCreateComponent, this.#listComponent, 'afterbegin');
+  }
+
+  #handleFormCreateSubmit() {
+    this.#removeFormCreate();
   }
 
   #removeFormCreate() {
@@ -169,4 +175,15 @@ export default class Presenter {
     this.#pointPresenters.forEach((presenter) => presenter.resetView());
     this.#removeFormCreate();
   }
+
+  #escKeyDownHandler = (evt) => {
+    if (evt.key === 'Escape' || evt.key === 'Esc') {
+      evt.preventDefault();
+      if (this.#formCreateComponent) {
+        this.#removeFormCreate();
+      } else {
+        this.#pointPresenters.forEach((presenter) => presenter.resetView());
+      }
+    }
+  };
 }

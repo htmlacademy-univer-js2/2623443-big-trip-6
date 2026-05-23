@@ -33,8 +33,8 @@ export default class PointPresenter {
       point: this.#point,
       destination,
       offersList,
-      onEditClick: this.#handlePointEdit,
-      onFavoriteClick: this.#handleFavoriteClick
+      onEditClick: () => this.#handlePointEdit(),
+      onFavoriteClick: () => this.#handleFavoriteClick()
     });
 
     if (prevPointComponent === null) {
@@ -45,25 +45,19 @@ export default class PointPresenter {
   }
 
   #renderFormEdit() {
-    const destination = this.#model.getDestinationById(this.#point.destinationId);
-    const availableOffers = this.#model.getOffersByType(this.#point.type);
-
-    const prevFormEditComponent = this.#formEditComponent;
+    const offersByType = this.#model.getAllOffers();
 
     this.#formEditComponent = new FormEditView({
       point: this.#point,
-      destination,
-      availableOffers,
-      selectedOfferIds: this.#point.offersIds,
-      onFormSubmit: this.#handleFormSubmit,
-      onFormClose: this.#handleFormClose
+      destinations: this.#model.getDestinations(),
+      offersByType,
+      onFormSubmit: (state) => this.#handleFormSubmit(state),
+      onFormClose: () => this.#handleFormClose(),
+      onTypeChange: (type) => this.#handleTypeChange(type),
+      onDestinationChange: (id) => this.#handleDestinationChange(id)
     });
 
-    if (prevFormEditComponent === null) {
-      replace(this.#formEditComponent, this.#pointComponent);
-    } else {
-      replace(this.#formEditComponent, prevFormEditComponent);
-    }
+    replace(this.#formEditComponent, this.#pointComponent);
   }
 
   resetView() {
@@ -75,27 +69,41 @@ export default class PointPresenter {
 
   updatePoint(updatedPoint) {
     this.#point = updatedPoint;
-    this.#renderPoint();
+    if (this.#formEditComponent === null) {
+      this.#renderPoint();
+    }
   }
 
-  #handlePointEdit = () => {
-    this.#onModeChange();
+  #handlePointEdit() {
+    this.#onModeChange(this);
     this.#renderFormEdit();
-  };
+  }
 
-  #handleFormClose = () => {
+  #handleFormClose() {
     this.resetView();
-  };
+  }
 
-  #handleFormSubmit = () => {
+  #handleFormSubmit(updatedState) {
+    const { offers, ...pointData } = updatedState;
+    const updatedPoint = {
+      ...this.#point,
+      ...pointData,
+      offersIds: offers
+    };
+    this.#point = updatedPoint;
+    this.#onDataChange(updatedPoint);
     this.resetView();
-  };
+  }
 
-  #handleFavoriteClick = () => {
+  #handleFavoriteClick() {
     const updatedPoint = {
       ...this.#point,
       isFavorite: !this.#point.isFavorite
     };
     this.#onDataChange(updatedPoint);
-  };
+  }
+
+  #handleTypeChange() {}
+
+  #handleDestinationChange() {}
 }

@@ -31,8 +31,11 @@ export default class PointsModel {
   }
 
   getOffersByType(type) {
-    const typeOffers = this.#offersByType[type];
-    return typeOffers || [];
+    return this.#offersByType[type] || [];
+  }
+
+  getAllOffers() {
+    return this.#offersByType;
   }
 
   updatePoint(update) {
