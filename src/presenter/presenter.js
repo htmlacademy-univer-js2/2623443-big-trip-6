@@ -1,6 +1,8 @@
 import SortView from '../view/sort-view.js';
 import FormCreateView from '../view/form-create-view.js';
 import NoPointsView from '../view/no-points-view.js';
+import LoadingView from '../view/loading-view.js';
+import ErrorView from '../view/error-view.js';
 import PointPresenter from './point-presenter.js';
 import { render, remove } from '../framework/render.js';
 import { UpdateType, FilterType } from '../const.js';
@@ -20,7 +22,10 @@ export default class Presenter {
   #formCreateComponent = null;
   #sortComponent = null;
   #noPointsComponent = null;
+  #loadingComponent = null;
+  #errorComponent = null;
   #currentSortType = 'day';
+  #isDataLoaded = false;
 
   constructor({listComponent, pointsModel, filtersModel}) {
     this.#listComponent = listComponent;
@@ -33,17 +38,38 @@ export default class Presenter {
     this.#filterPresenter = filterPresenter;
   }
 
-  onFilterChange() {
-    this.#currentSortType = 'day';
-    this.#renderSort();
-    this.#renderPoints();
+  async init() {
+    this.#renderLoading();
+    try {
+      await this.#pointsModel.init();
+      this.#isDataLoaded = true;
+      this.#removeLoading();
+      this.#filterPresenter?.update();
+      this.#renderSort();
+      this.#renderPoints();
+      this.#setNewEventButtonListener();
+      document.addEventListener('keydown', this.#escKeyDownHandler);
+    } catch (error) {
+      this.#removeLoading();
+      this.#renderError();
+    }
   }
 
-  init() {
-    this.#renderSort();
-    this.#renderPoints();
-    this.#setNewEventButtonListener();
-    document.addEventListener('keydown', this.#escKeyDownHandler);
+  #renderLoading() {
+    this.#loadingComponent = new LoadingView();
+    render(this.#loadingComponent, this.#listComponent);
+  }
+
+  #removeLoading() {
+    if (this.#loadingComponent) {
+      remove(this.#loadingComponent);
+      this.#loadingComponent = null;
+    }
+  }
+
+  #renderError() {
+    this.#errorComponent = new ErrorView();
+    render(this.#errorComponent, this.#listComponent);
   }
 
   #renderSort() {
@@ -51,7 +77,7 @@ export default class Presenter {
       remove(this.#sortComponent);
       this.#sortComponent = null;
     }
-    if (this.#sortContainer) {
+    if (this.#sortContainer && this.#isDataLoaded) {
       this.#sortComponent = new SortView({
         currentSortType: this.#currentSortType,
         onSortTypeChange: this.#handleSortTypeChange
@@ -115,6 +141,10 @@ export default class Presenter {
     if (this.#noPointsComponent) {
       remove(this.#noPointsComponent);
       this.#noPointsComponent = null;
+    }
+    if (this.#errorComponent) {
+      remove(this.#errorComponent);
+      this.#errorComponent = null;
     }
     this.#pointPresenters.forEach((presenter) => presenter.destroy());
     this.#pointPresenters.clear();
@@ -183,13 +213,17 @@ export default class Presenter {
     }
   }
 
-  #handleViewAction = (updateType, update) => {
+  #handleViewAction = async (updateType, update) => {
     switch (updateType) {
       case UpdateType.PATCH: {
-        this.#pointsModel.updatePoint(update);
-        const pointPresenter = this.#pointPresenters.get(update.id);
-        if (pointPresenter) {
-          pointPresenter.updatePoint(update);
+        try {
+          const updated = await this.#pointsModel.updatePointOnServer(update);
+          this.#pointsModel.updatePoint(updated);
+          const pointPresenter = this.#pointPresenters.get(updated.id);
+          if (pointPresenter) {
+            pointPresenter.updatePoint(updated);
+          }
+        } catch (error) { //
         }
         break;
       }
@@ -207,6 +241,12 @@ export default class Presenter {
       }
     }
   };
+
+  onFilterChange() {
+    this.#currentSortType = 'day';
+    this.#renderSort();
+    this.#renderPoints();
+  }
 
   #handleModeChange = () => {
     this.#resetAllViews();
