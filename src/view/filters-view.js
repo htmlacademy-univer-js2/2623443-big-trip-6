@@ -1,9 +1,13 @@
 import AbstractView from '../framework/view/abstract-view.js';
+import dayjs from 'dayjs';
 
 function createFilterTemplate(currentFilter, points) {
-  const hasFuture = points.some((p) => new Date(p.dateFrom) > new Date());
-  const hasPresent = points.some((p) => new Date(p.dateFrom) <= new Date() && new Date(p.dateTo) >= new Date());
-  const hasPast = points.some((p) => new Date(p.dateTo) < new Date());
+  const now = dayjs();
+  const hasFuture = points.some((p) => dayjs(p.dateFrom).isAfter(now));
+  const hasPresent = points.some((p) =>
+    !dayjs(p.dateFrom).isAfter(now) && !dayjs(p.dateTo).isBefore(now)
+  );
+  const hasPast = points.some((p) => dayjs(p.dateTo).isBefore(now));
 
   return `
     <form class='trip-filters' action='#' method='get'>

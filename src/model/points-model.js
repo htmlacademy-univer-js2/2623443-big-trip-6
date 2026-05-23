@@ -1,12 +1,30 @@
-import { points, offers, destinations, offersByType } from '../mock/point.js';
 import { FilterType } from '../const.js';
 import dayjs from 'dayjs';
+import { fetchPoints, fetchDestinations, fetchOffers, updatePoint } from '../api/api-service.js';
+import { adaptPointToClient, adaptPointToServer, adaptDestinationsToClient, adaptOffersToClient } from '../api/adapter.js';
 
 export default class PointsModel {
-  #points = points();
-  #offers = offers();
-  #destinations = destinations();
-  #offersByType = offersByType();
+  #points = [];
+  #destinations = [];
+  #offersByType = {};
+
+  async init() {
+    try {
+      const [pointsData, destinationsData, offersData] = await Promise.all([
+        fetchPoints(),
+        fetchDestinations(),
+        fetchOffers(),
+      ]);
+      this.#points = pointsData.map(adaptPointToClient);
+      this.#destinations = adaptDestinationsToClient(destinationsData);
+      this.#offersByType = adaptOffersToClient(offersData);
+    } catch (error) {
+      this.#points = [];
+      this.#destinations = [];
+      this.#offersByType = {};
+      throw error;
+    }
+  }
 
   getPoints() {
     return this.#points;
@@ -37,7 +55,7 @@ export default class PointsModel {
   }
 
   getOffers() {
-    return this.#offers;
+    return this.#offersByType;
   }
 
   getDestinations() {
@@ -45,7 +63,13 @@ export default class PointsModel {
   }
 
   getOfferById(offerId) {
-    return this.#offers.find((offer) => offer.id === offerId);
+    for (const type in this.#offersByType) {
+      const offer = this.#offersByType[type].find((o) => o.id === offerId);
+      if (offer) {
+        return offer;
+      }
+    }
+    return null;
   }
 
   getDestinationById(destinationId) {
@@ -53,7 +77,15 @@ export default class PointsModel {
   }
 
   getOffersByIds(offerIds) {
-    return offerIds.map((id) => this.getOfferById(id)).filter(Boolean);
+    const result = [];
+    for (const type in this.#offersByType) {
+      for (const offer of this.#offersByType[type]) {
+        if (offerIds.includes(offer.id)) {
+          result.push(offer);
+        }
+      }
+    }
+    return result;
   }
 
   getOffersByType(type) {
@@ -80,5 +112,11 @@ export default class PointsModel {
       default:
         return allPoints;
     }
+  }
+
+  async updatePointOnServer(point) {
+    const serverPoint = adaptPointToServer(point);
+    const updated = await updatePoint(serverPoint);
+    return adaptPointToClient(updated);
   }
 }
