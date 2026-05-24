@@ -19,6 +19,7 @@ export default class Presenter {
   #pointsModel = null;
   #filtersModel = null;
   #filterPresenter = null;
+  #tripInfoPresenter = null;
   #sortContainer = null;
   #pointPresenters = new Map();
   #formCreateComponent = null;
@@ -29,10 +30,11 @@ export default class Presenter {
   #currentSortType = 'day';
   #isDataLoaded = false;
 
-  constructor({listComponent, pointsModel, filtersModel}) {
+  constructor({listComponent, pointsModel, filtersModel, tripInfoPresenter}) {
     this.#listComponent = listComponent;
     this.#pointsModel = pointsModel;
     this.#filtersModel = filtersModel;
+    this.#tripInfoPresenter = tripInfoPresenter;
     this.#sortContainer = document.querySelector('.trip-events');
   }
 
@@ -47,6 +49,7 @@ export default class Presenter {
       this.#isDataLoaded = true;
       this.#removeLoading();
       this.#filterPresenter?.update();
+      this.#tripInfoPresenter?.update();
       this.#renderSort();
       this.#renderPoints();
       this.#setNewEventButtonListener();
@@ -220,6 +223,7 @@ export default class Presenter {
       const adaptedPoint = adaptPointToClient(response);
       this.#pointsModel.addPoint(adaptedPoint);
       this.#filterPresenter?.update();
+      this.#tripInfoPresenter?.update();
       this.#removeFormCreate();
       this.#renderPoints();
     } catch (error) {
@@ -242,17 +246,20 @@ export default class Presenter {
         if (pointPresenter) {
           pointPresenter.updatePoint(update);
         }
+        this.#tripInfoPresenter?.update();
         break;
       }
       case UpdateType.DELETE: {
         this.#pointsModel.deletePoint(update.id);
         this.#filterPresenter?.update();
+        this.#tripInfoPresenter?.update();
         this.#renderPoints();
         break;
       }
       case UpdateType.ADD: {
         this.#pointsModel.addPoint(update);
         this.#filterPresenter?.update();
+        this.#tripInfoPresenter?.update();
         this.#renderPoints();
         break;
       }
