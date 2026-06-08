@@ -17,3 +17,12 @@ export const EmptyListMessage = {
   [FilterType.PRESENT]: 'There are no present events now',
   [FilterType.PAST]: 'There are no past events now',
 };
+
+export const POINT_TYPES = ['taxi', 'bus', 'train', 'ship', 'drive', 'flight', 'check-in', 'sightseeing', 'restaurant'];
+
+export const DEFAULT_POINT_TYPE = 'flight';
+
+export const MS_IN_MINUTE = 60000;
+export const MINUTES_IN_HOUR = 60;
+export const MINUTES_IN_DAY = 1440;
+export const TOKEN_LENGTH = 16;

@@ -1,144 +1,114 @@
 import AbstractStatefulView from '../framework/view/abstract-stateful-view.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
-import dayjs from 'dayjs';
+import he from 'he';
+import { POINT_TYPES } from '../const.js';
+import { shake } from '../utils/shake.js';
 
-function formatDateForInput(dateString) {
-  if (!dateString) {
-    return '';
+function getSaveButtonText(state) {
+  if (state.isSaving) {
+    return 'Saving...';
   }
-  return dayjs(dateString).format('DD/MM/YY HH:mm');
+  if (state.isDeleting) {
+    return 'Deleting...';
+  }
+  return 'Save';
+}
+
+function isSaveButtonDisabled(state) {
+  return state.isSaving || state.isDeleting;
 }
 
 function createFormEditTemplate(state, destinations, offersByType) {
-  const { type, basePrice, dateFrom, dateTo, destinationId, offers } = state;
-  const destination = destinations.find((d) => d.id === destinationId) || null;
-  const destinationName = destination?.name || '';
-  const availableOffers = offersByType[type] || [];
-
-  const offersTemplate = availableOffers.length ? `
-    <section class='event__section event__section--offers'>
-      <h3 class='event__section-title event__section-title--offers'>Offers</h3>
-      <div class='event__available-offers'>
-        ${availableOffers.map((offer) => {
-    const isChecked = offers.includes(offer.id);
-    return `
-            <div class='event__offer-selector'>
-              <input class='event__offer-checkbox visually-hidden'
-                     id='offer-${offer.id}'
-                     type='checkbox'
-                     name='offer'
-                     value='${offer.id}'
-                     ${isChecked ? 'checked' : ''}>
-              <label class='event__offer-label' for='offer-${offer.id}'>
-                <span class='event__offer-title'>${offer.title}</span>
-                &plus;&euro;&nbsp;
-                <span class='event__offer-price'>${offer.price}</span>
-              </label>
-            </div>
-          `;
-  }).join('')}
-      </div>
-    </section>
-  ` : '';
-
-  const destinationTemplate = (destination?.description || destination?.pictures?.length) ? `
-    <section class='event__section event__section--destination'>
-      <h3 class='event__section-title event__section-title--destination'>Destination</h3>
-      ${destination.description ? `<p class='event__destination-description'>${destination.description}</p>` : ''}
-      ${destination.pictures?.length ? `
-        <div class='event__photos-container'>
-          <div class='event__photos-tape'>
-            ${destination.pictures.map((pic) => `
-              <img class='event__photo' src='${pic}' alt='${destination.name} photo'>
-            `).join('')}
-          </div>
-        </div>
-      ` : ''}
-    </section>
-  ` : '';
+  const { id, basePrice, dateFrom, dateTo, destinationId, offers, type } = state;
+  const currentDestination = destinations.find((dest) => dest.id === destinationId);
+  const currentOffers = (offersByType[type] || []).filter(Boolean);
+  const safeOffers = Array.isArray(offers) ? offers : [];
+  const destinationName = currentDestination ? he.escape(currentDestination.name) : '';
 
   return `
-    <li class='trip-events__item'>
-      <form class='event event--edit' action='#' method='post'>
-        <header class='event__header'>
-          <div class='event__type-wrapper'>
-            <label class='event__type event__type-btn' for='event-type-toggle-1'>
-              <span class='visually-hidden'>Choose event type</span>
-              <img class='event__type-icon' width='17' height='17' src='img/icons/${type}.png' alt='Event type icon'>
+    <li class="trip-events__item">
+      <form class="event event--edit" action="#" method="post">
+        <header class="event__header">
+          <div class="event__type-wrapper">
+            <label class="event__type  event__type-btn" for="event-type-toggle-${id}">
+              <span class="visually-hidden">Choose event type</span>
+              <img class="event__type-icon" width="17" height="17" src="img/icons/${type}.png" alt="Event type icon">
             </label>
-            <input class='event__type-toggle visually-hidden' id='event-type-toggle-1' type='checkbox'>
-            <div class='event__type-list'>
-              <fieldset class='event__type-group'>
-                <legend class='visually-hidden'>Event type</legend>
-                <button class='event__type-item event__type-item--btn' type='button' data-type='taxi'>Taxi</button>
-                <button class='event__type-item event__type-item--btn' type='button' data-type='bus'>Bus</button>
-                <button class='event__type-item event__type-item--btn' type='button' data-type='train'>Train</button>
-                <button class='event__type-item event__type-item--btn' type='button' data-type='ship'>Ship</button>
-                <button class='event__type-item event__type-item--btn' type='button' data-type='drive'>Drive</button>
-                <button class='event__type-item event__type-item--btn' type='button' data-type='flight'>Flight</button>
-                <button class='event__type-item event__type-item--btn' type='button' data-type='check-in'>Check-in</button>
-                <button class='event__type-item event__type-item--btn' type='button' data-type='sightseeing'>Sightseeing</button>
-                <button class='event__type-item event__type-item--btn' type='button' data-type='restaurant'>Restaurant</button>
+            <input class="event__type-toggle  visually-hidden" id="event-type-toggle-${id}" type="checkbox">
+            <div class="event__type-list">
+              <fieldset class="event__type-group">
+                <legend class="visually-hidden">Event type</legend>
+                ${POINT_TYPES.map((item) => `
+                  <div class="event__type-item">
+                    <input class="event__type-input  visually-hidden" type="radio" name="event-type" id="event-type-${item}" value="${item}" ${type === item ? 'checked' : ''}>
+                    <label class="event__type-label  event__type-label--${item}" for="event-type-${item}">${item}</label>
+                  </div>
+                `).join('')}
               </fieldset>
             </div>
           </div>
-          <div class='event__field-group event__field-group--destination'>
-            <label class='event__label event__type-output' for='event-destination-1'>
-              ${type} to
+          <div class="event__field-group  event__field-group--destination">
+            <label class="event__label  event__type-output" for="event-destination-${id}">
+              ${he.escape(type)}
             </label>
-            <input class='event__input event__input--destination'
-                   id='event-destination-1'
-                   type='text'
-                   name='event-destination'
-                   value='${destinationName}'
-                   list='destination-list-1'
-                   required>
-            <datalist id='destination-list-1'>
-              ${destinations.map((d) => `<option value='${d.name}'></option>`).join('')}
+            <input class="event__input  event__input--destination" id="event-destination-${id}" type="text" name="event-destination" value="${destinationName}" list="destination-list-${id}">
+            <datalist id="destination-list-${id}">
+              ${destinations.map((dest) => `<option value="${he.escape(dest.name)}"></option>`).join('')}
             </datalist>
           </div>
-          <div class='event__field-group event__field-group--time'>
-            <label class='visually-hidden' for='event-start-time-1'>From</label>
-            <input class='event__input event__input--time'
-                   id='event-start-time-1'
-                   type='text'
-                   name='event-start-time'
-                   value='${dateFrom ? formatDateForInput(dateFrom) : ''}'
-                   placeholder='19/03/19 00:00'
-                   required>
+          <div class="event__field-group  event__field-group--time">
+            <label class="visually-hidden" for="event-start-time-${id}">From</label>
+            <input class="event__input  event__input--time" id="event-start-time-${id}" type="text" name="event-start-time" value="${dateFrom || ''}">
             &mdash;
-            <label class='visually-hidden' for='event-end-time-1'>To</label>
-            <input class='event__input event__input--time'
-                   id='event-end-time-1'
-                   type='text'
-                   name='event-end-time'
-                   value='${dateTo ? formatDateForInput(dateTo) : ''}'
-                   placeholder='19/03/19 00:00'
-                   required>
+            <label class="visually-hidden" for="event-end-time-${id}">To</label>
+            <input class="event__input  event__input--time" id="event-end-time-${id}" type="text" name="event-end-time" value="${dateTo || ''}">
           </div>
-          <div class='event__field-group event__field-group--price'>
-            <label class='visually-hidden' for='event-price-1'>Price</label>
-            <input class='event__input event__input--price'
-                   id='event-price-1'
-                   type='number'
-                   name='event-price'
-                   value='${basePrice}'
-                   min='0'
-                   required>
+          <div class="event__field-group  event__field-group--price">
+            <label class="event__label" for="event-price-${id}">
+              <span class="visually-hidden">Price</span>
+              &euro;
+            </label>
+            <input class="event__input  event__input--price" id="event-price-${id}" type="text" name="event-price" value="${he.escape(`${basePrice}`)}">
           </div>
-          <button class='event__save-btn btn btn--blue' type='submit'>Save</button>
-          <button class='event__reset-btn' type='reset'>Delete</button>
-          <button class='event__rollup-btn' type='button'>
-            <span class='visually-hidden'>Open event</span>
-          </button>
+          <button class="event__save-btn  btn  btn--blue" type="submit"${isSaveButtonDisabled(state) ? ' disabled' : ''}>${getSaveButtonText(state)}</button>
+          <button class="event__rollup-btn" type="button"></button>
+          <button class="event__reset-btn" type="reset">${state.isDeleting ? 'Deleting...' : 'Delete'}</button>
         </header>
-        ${(offersTemplate || destinationTemplate) ? `
-          <section class='event__details'>
-            ${offersTemplate}
-            ${destinationTemplate}
-          </section>
-        ` : ''}
+        <section class="event__details">
+          ${currentOffers.length ? `
+            <section class="event__section  event__section--offers">
+              <h3 class="event__section-title  event__section-title--offers">Offers</h3>
+              <div class="event__available-offers">
+                ${currentOffers.map((offer) => `
+                  <div class="event__offer-selector">
+                    <input class="event__offer-checkbox  visually-hidden" id="event-offer-${offer.id}" type="checkbox" name="event-offer" value="${offer.id}" ${safeOffers.includes(offer.id) ? 'checked' : ''}>
+                    <label class="event__offer-label" for="event-offer-${offer.id}">
+                      <span class="event__offer-title">${he.escape(offer.title)}</span>
+                      &plus;&euro;&nbsp;
+                      <span class="event__offer-price">${he.escape(`${offer.price}`)}</span>
+                    </label>
+                  </div>
+                `).join('')}
+              </div>
+            </section>
+          ` : ''}
+          ${currentDestination && currentDestination.description ? `
+            <section class="event__section  event__section--destination">
+              <h3 class="event__section-title  event__section-title--destination">Destination</h3>
+              <p class="event__destination-description">${he.escape(currentDestination.description)}</p>
+              ${currentDestination.pictures && currentDestination.pictures.length ? `
+                <div class="event__photos-container">
+                  <div class="event__photos-tape">
+                    ${currentDestination.pictures.map((pic) => `
+                      <img class="event__photo" src="${he.escape(pic.src)}" alt="${he.escape(pic.description)}">
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+            </section>
+          ` : ''}
+        </section>
       </form>
     </li>
   `;
@@ -150,25 +120,31 @@ export default class FormEditView extends AbstractStatefulView {
   #onFormSubmit = null;
   #onFormClose = null;
   #onDeleteClick = null;
-  #datepickerStart = null;
-  #datepickerEnd = null;
+  #datepickerFrom = null;
+  #datepickerTo = null;
 
   constructor({point, destinations, offersByType, onFormSubmit, onFormClose, onDeleteClick}) {
     super();
-    this._setState({
-      id: point.id,
-      type: point.type,
-      basePrice: point.basePrice,
-      dateFrom: point.dateFrom,
-      dateTo: point.dateTo,
-      destinationId: point.destinationId,
-      offers: [...point.offersIds]
-    });
-    this.#destinations = destinations;
-    this.#offersByType = offersByType;
+    this.#destinations = destinations || [];
+    this.#offersByType = offersByType || {};
     this.#onFormSubmit = onFormSubmit;
     this.#onFormClose = onFormClose;
     this.#onDeleteClick = onDeleteClick;
+
+    this._setState({
+      id: point.id || '',
+      basePrice: point.basePrice || 0,
+      dateFrom: point.dateFrom || '',
+      dateTo: point.dateTo || '',
+      destinationId: point.destinationId || '',
+      offers: Array.isArray(point.offersIds) ? point.offersIds : [],
+      type: point.type || 'flight',
+      isSaving: false,
+      isDeleting: false,
+      isSaveError: false,
+      isDeleteError: false
+    });
+
     this._restoreHandlers();
   }
 
@@ -177,152 +153,122 @@ export default class FormEditView extends AbstractStatefulView {
   }
 
   _restoreHandlers() {
-    this.element.querySelector('form').addEventListener('submit', (evt) => this.#formSubmitHandler(evt));
-    this.element.querySelector('.event__rollup-btn').addEventListener('click', (evt) => this.#formCloseHandler(evt));
-    this.element.querySelector('.event__reset-btn').addEventListener('click', (evt) => this.#deleteClickHandler(evt));
+    this.element.querySelector('form').addEventListener('submit', this.#formSubmitHandler);
+    this.element.querySelector('.event__type-group').addEventListener('change', this.#typeChangeHandler);
+    this.element.querySelector('.event__input--destination').addEventListener('change', this.#destinationChangeHandler);
+    this.element.querySelector('.event__input--price').addEventListener('input', this.#priceInputHandler);
+    this.element.querySelector('.event__available-offers')?.addEventListener('change', this.#offersChangeHandler);
+    this.element.querySelector('.event__rollup-btn').addEventListener('click', this.#formCloseHandler);
+    this.element.querySelector('.event__reset-btn').addEventListener('click', this.#deleteClickHandler);
+    this.#setDatepickers();
+  }
 
-    this.element.querySelectorAll('.event__type-item--btn').forEach((btn) => {
-      btn.addEventListener('click', (evt) => this.#typeChangeHandler(evt));
-    });
-
-    this.element.querySelector('.event__input--destination').addEventListener('change', (evt) => this.#destinationChangeHandler(evt));
-
-    this.element.querySelectorAll('.event__offer-checkbox').forEach((checkbox) => {
-      checkbox.addEventListener('change', (evt) => this.#offerChangeHandler(evt));
-    });
-
-    this.element.querySelector('.event__input--price').addEventListener('input', (evt) => {
-      evt.target.value = evt.target.value.replace(/[^0-9]/g, '');
-    });
-    this.element.querySelector('.event__input--price').addEventListener('change', (evt) => {
-      this._setState({ ...this._state, basePrice: Number(evt.target.value) || 0 });
-    });
-
-    const startTimeElement = this.element.querySelector('[name="event-start-time"]');
-    const endTimeElement = this.element.querySelector('[name="event-end-time"]');
-
-    if (this.#datepickerStart) {
-      this.#datepickerStart.destroy();
+  removeElement() {
+    super.removeElement();
+    if (this.#datepickerFrom) {
+      this.#datepickerFrom.destroy();
+      this.#datepickerFrom = null;
     }
-    if (this.#datepickerEnd) {
-      this.#datepickerEnd.destroy();
+    if (this.#datepickerTo) {
+      this.#datepickerTo.destroy();
+      this.#datepickerTo = null;
     }
+  }
 
-    this.#datepickerStart = flatpickr(startTimeElement, {
-      dateFormat: 'd/m/y H:i',
-      enableTime: true,
-      locale: { firstDayOfWeek: 1 },
-      'time_24hr': true,
-      defaultDate: this._state.dateFrom ? new Date(this._state.dateFrom) : null,
-      onChange: this.#dateChangeHandler('dateFrom')
-    });
-
-    this.#datepickerEnd = flatpickr(endTimeElement, {
-      dateFormat: 'd/m/y H:i',
-      enableTime: true,
-      locale: { firstDayOfWeek: 1 },
-      'time_24hr': true,
-      defaultDate: this._state.dateTo ? new Date(this._state.dateTo) : null,
-      minDate: this._state.dateFrom ? new Date(this._state.dateFrom) : null,
-      onChange: this.#dateChangeHandler('dateTo')
+  reset(point) {
+    this.updateElement({
+      ...point,
+      isSaving: false,
+      isDeleting: false,
+      isSaveError: false,
+      isDeleteError: false
     });
   }
 
   setSaving() {
-    this.element.querySelector('.event__save-btn').textContent = 'Saving...';
-    this.#setDisabled(true);
-  }
-
-  setDeleting() {
-    this.element.querySelector('.event__reset-btn').textContent = 'Deleting...';
-    this.#setDisabled(true);
+    this.updateElement({ isSaving: true, isSaveError: false });
   }
 
   setSaveError() {
-    this.#setDisabled(false);
-    this.element.querySelector('.event__save-btn').textContent = 'Save';
-    this.#shake();
+    this.updateElement({ isSaving: false, isSaveError: true });
+    shake(this.element);
+  }
+
+  setDeleting() {
+    this.updateElement({ isDeleting: true, isDeleteError: false });
   }
 
   setDeleteError() {
-    this.#setDisabled(false);
-    this.element.querySelector('.event__reset-btn').textContent = 'Delete';
-    this.#shake();
+    this.updateElement({ isDeleting: false, isDeleteError: true });
+    shake(this.element);
   }
 
-  #setDisabled(isDisabled) {
-    this.element.querySelectorAll('input, select, button').forEach((el) => {
-      el.disabled = isDisabled;
-    });
-  }
-
-  #shake() {
-    this.element.classList.add('shake');
-    setTimeout(() => this.element.classList.remove('shake'), 600);
-  }
-
-  #formSubmitHandler(evt) {
+  #formSubmitHandler = (evt) => {
     evt.preventDefault();
     this.#onFormSubmit(this._state);
-  }
+  };
 
-  #formCloseHandler(evt) {
+  #formCloseHandler = (evt) => {
     evt.preventDefault();
     this.#onFormClose();
-  }
+  };
 
-  #deleteClickHandler(evt) {
+  #deleteClickHandler = (evt) => {
     evt.preventDefault();
     this.#onDeleteClick();
-  }
+  };
 
-  #typeChangeHandler(evt) {
-    evt.preventDefault();
-    const newType = evt.target.dataset.type;
-    if (!newType) {
-      return;
-    }
-    this.updateElement({
-      ...this._state,
-      type: newType,
-      offers: []
-    });
-  }
+  #typeChangeHandler = (evt) => {
+    this.updateElement({ type: evt.target.value, offers: [] });
+  };
 
-  #destinationChangeHandler(evt) {
-    const newDestinationName = evt.target.value;
-    const destination = this.#destinations.find((d) => d.name === newDestinationName);
-    if (!destination) {
-      return;
+  #destinationChangeHandler = (evt) => {
+    const selectedDestination = this.#destinations.find((dest) => dest.name === evt.target.value);
+    if (selectedDestination) {
+      this.updateElement({ destinationId: selectedDestination.id });
     }
-    this.updateElement({
-      ...this._state,
-      destinationId: destination.id
-    });
-  }
+  };
 
-  #offerChangeHandler(evt) {
-    const offerId = evt.target.value;
-    const currentOffers = [...this._state.offers];
-    const index = currentOffers.indexOf(offerId);
-    if (index === -1) {
-      currentOffers.push(offerId);
-    } else {
-      currentOffers.splice(index, 1);
-    }
-    this.updateElement({
-      ...this._state,
-      offers: currentOffers
-    });
-  }
+  #priceInputHandler = (evt) => {
+    this._setState({ basePrice: evt.target.value });
+  };
 
-  #dateChangeHandler = (key) => ([selectedDate]) => {
-    this._setState({
-      ...this._state,
-      [key]: selectedDate.toISOString()
+  #offersChangeHandler = () => {
+    const offers = Array.from(this.element.querySelectorAll('.event__offer-checkbox:checked')).map((el) => el.value);
+    this._setState({ offers });
+  };
+
+  #setDatepickers = () => {
+    const [dateFromElement, dateToElement] = this.element.querySelectorAll('.event__input--time');
+    const commonConfig = {
+      dateFormat: 'd/m/y H:i',
+      enableTime: true,
+      locale: { firstDayOfWeek: 1 },
+      'time_24hr': true
+    };
+
+    this.#datepickerFrom = flatpickr(dateFromElement, {
+      ...commonConfig,
+      defaultDate: this._state.dateFrom,
+      onClose: this.#dateFromChangeHandler,
+      maxDate: this._state.dateTo
     });
-    if (key === 'dateFrom') {
-      this.#datepickerEnd.set('minDate', this._state.dateFrom);
-    }
+
+    this.#datepickerTo = flatpickr(dateToElement, {
+      ...commonConfig,
+      defaultDate: this._state.dateTo,
+      onClose: this.#dateToChangeHandler,
+      minDate: this._state.dateFrom
+    });
+  };
+
+  #dateFromChangeHandler = ([userDate]) => {
+    this._setState({ dateFrom: userDate });
+    this.#datepickerTo.set('minDate', this._state.dateFrom);
+  };
+
+  #dateToChangeHandler = ([userDate]) => {
+    this._setState({ dateTo: userDate });
+    this.#datepickerFrom.set('maxDate', this._state.dateTo);
   };
 }

@@ -1,5 +1,7 @@
 import AbstractView from '../framework/view/abstract-view.js';
 import dayjs from 'dayjs';
+import he from 'he';
+import { MS_IN_MINUTE, MINUTES_IN_HOUR, MINUTES_IN_DAY } from '../const.js';
 
 function createPointItemTemplate(point, destination, offersList) {
   const { type, basePrice, dateFrom, dateTo, isFavorite } = point;
@@ -11,26 +13,28 @@ function createPointItemTemplate(point, destination, offersList) {
   const endTime = dayjs(dateTo).format('HH:mm');
 
   const durationMs = dayjs(dateTo).diff(dateFrom);
-  const durationMinutes = Math.floor(durationMs / 60000);
+  const durationMinutes = Math.floor(durationMs / MS_IN_MINUTE);
 
-  let durationStr = '';
-  if (durationMinutes < 60) {
-    durationStr = `${durationMinutes}M`;
-  } else if (durationMinutes < 1440) {
-    durationStr = `${Math.floor(durationMinutes / 60)}H ${durationMinutes % 60}M`;
-  } else {
-    durationStr = `${Math.floor(durationMinutes / 1440)}D ${Math.floor((durationMinutes % 1440) / 60)}H ${durationMinutes % 60}M`;
-  }
+  const days = Math.floor(durationMinutes / MINUTES_IN_DAY);
+  const hours = Math.floor((durationMinutes % MINUTES_IN_DAY) / MINUTES_IN_HOUR);
+  const minutes = durationMinutes % MINUTES_IN_HOUR;
+
+  const daysStr = String(days).padStart(2, '0');
+  const hoursStr = String(hours).padStart(2, '0');
+  const minutesStr = String(minutes).padStart(2, '0');
+  const durationStr = `${daysStr}D ${hoursStr}H ${minutesStr}M`;
 
   const typeIcon = `img/icons/${type}.png`;
-  const destinationName = destination ? destination.name : '';
+  const destinationName = destination ? he.escape(destination.name) : '';
+
   const offersHtml = offersList.map((offer) => `
     <li class='event__offer'>
-      <span class='event__offer-title'>${offer.title}</span>
+      <span class='event__offer-title'>${he.escape(offer.title)}</span>
       &plus;&euro;&nbsp;
-      <span class='event__offer-price'>${offer.price}</span>
+      <span class='event__offer-price'>${he.escape(String(offer.price))}</span>
     </li>
   `).join('');
+
   const favoriteClass = isFavorite ? 'event__favorite-btn--active' : '';
 
   return `
@@ -40,7 +44,7 @@ function createPointItemTemplate(point, destination, offersList) {
         <div class='event__type'>
           <img class='event__type-icon' width='42' height='42' src='${typeIcon}' alt='Event type icon'>
         </div>
-        <h3 class='event__title'>${type} ${destinationName}</h3>
+        <h3 class='event__title'>${he.escape(type)} ${destinationName}</h3>
         <div class='event__schedule'>
           <p class='event__time'>
             <time class='event__start-time' datetime='${dateFrom}'>${startTime}</time>
@@ -50,7 +54,7 @@ function createPointItemTemplate(point, destination, offersList) {
           <p class='event__duration'>${durationStr}</p>
         </div>
         <p class='event__price'>
-          €&nbsp;<span class='event__price-value'>${basePrice}</span>
+          €&nbsp;<span class='event__price-value'>${he.escape(String(basePrice))}</span>
         </p>
         <h4 class='visually-hidden'>Offers:</h4>
         <ul class='event__selected-offers'>

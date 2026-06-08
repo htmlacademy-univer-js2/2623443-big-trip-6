@@ -4,6 +4,7 @@ import { render, replace, remove } from '../framework/render.js';
 import { UpdateType } from '../const.js';
 import { updatePoint as apiUpdatePoint, deletePoint as apiDeletePoint } from '../api/api-service.js';
 import { adaptPointToServer, adaptPointToClient } from '../api/adapter.js';
+import { shake } from '../utils/shake.js';
 
 export default class PointPresenter {
   #listComponent = null;
@@ -82,7 +83,7 @@ export default class PointPresenter {
 
   updatePoint(updatedPoint) {
     this.#point = updatedPoint;
-    if (this.#formEditComponent === null) {
+    if (!this.#formEditComponent) {
       this.#renderPoint();
     }
   }
@@ -98,11 +99,22 @@ export default class PointPresenter {
 
   async #handleFormSubmit(updatedState) {
     const { offers, ...pointData } = updatedState;
-    const pointToSave = { ...this.#point, ...pointData, offersIds: offers };
-    this.#formEditComponent.setSaving();
+    const pointToSave = {
+      ...this.#point,
+      ...pointData,
+      offersIds: offers,
+      basePrice: Number(pointData.basePrice)
+    };
+
+    const formComponent = this.#formEditComponent;
+    if (!formComponent) {
+      return;
+    }
+
+    formComponent.setSaving();
 
     try {
-      const serverPoint = adaptPointToServer(pointToSave, true);
+      const serverPoint = adaptPointToServer(pointToSave);
       const response = await apiUpdatePoint(serverPoint);
 
       let adaptedPoint;
@@ -116,25 +128,53 @@ export default class PointPresenter {
       this.resetView();
       this.#onDataChange(UpdateType.PATCH, adaptedPoint);
     } catch (error) {
-      this.#formEditComponent.setSaveError();
+      if (this.#formEditComponent === formComponent) {
+        formComponent.setSaveError();
+      }
     }
   }
 
   async #handleDeleteClick() {
-    this.#formEditComponent.setDeleting();
+    const formComponent = this.#formEditComponent;
+    if (!formComponent) {
+      return;
+    }
+
+    formComponent.setDeleting();
+
     try {
       await apiDeletePoint(this.#point.id);
       this.#onDataChange(UpdateType.DELETE, this.#point);
     } catch (error) {
-      this.#formEditComponent.setDeleteError();
+      if (this.#formEditComponent === formComponent) {
+        formComponent.setDeleteError();
+      }
     }
   }
 
-  #handleFavoriteClick() {
+  async #handleFavoriteClick() {
     const updatedPoint = {
       ...this.#point,
       isFavorite: !this.#point.isFavorite
     };
-    this.#onDataChange(UpdateType.PATCH, updatedPoint);
+
+    try {
+      const serverPoint = adaptPointToServer(updatedPoint);
+      const response = await apiUpdatePoint(serverPoint);
+
+      let adaptedPoint;
+      if (response) {
+        adaptedPoint = adaptPointToClient(response);
+      } else {
+        adaptedPoint = updatedPoint;
+      }
+
+      this.#point = adaptedPoint;
+      this.#onDataChange(UpdateType.PATCH, adaptedPoint);
+    } catch (error) {
+      if (this.#pointComponent) {
+        shake(this.#pointComponent.element);
+      }
+    }
   }
 }

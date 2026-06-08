@@ -1,3 +1,5 @@
+import { TOKEN_LENGTH } from '../const.js';
+
 const BASE_URL = 'https://24.objects.htmlacademy.pro/big-trip';
 const ENDPOINTS = {
   POINTS: '/points',
@@ -11,7 +13,7 @@ let AUTH_TOKEN = localStorage.getItem(AUTH_TOKEN_KEY);
 if (!AUTH_TOKEN) {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < TOKEN_LENGTH; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   AUTH_TOKEN = `Basic ${result}`;

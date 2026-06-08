@@ -15,9 +15,9 @@ export default class PointsModel {
         fetchDestinations(),
         fetchOffers(),
       ]);
-      this.#points = pointsData.map(adaptPointToClient);
-      this.#destinations = adaptDestinationsToClient(destinationsData);
-      this.#offersByType = adaptOffersToClient(offersData);
+      this.#points = Array.isArray(pointsData) ? pointsData.map(adaptPointToClient) : [];
+      this.#destinations = adaptDestinationsToClient(destinationsData) || [];
+      this.#offersByType = adaptOffersToClient(offersData) || {};
     } catch (error) {
       this.#points = [];
       this.#destinations = [];
@@ -27,11 +27,11 @@ export default class PointsModel {
   }
 
   getPoints() {
-    return this.#points;
+    return this.#points || [];
   }
 
   setPoints(pointsData) {
-    this.#points = pointsData;
+    this.#points = Array.isArray(pointsData) ? pointsData : [];
   }
 
   updatePoint(update) {
@@ -55,16 +55,17 @@ export default class PointsModel {
   }
 
   getOffers() {
-    return this.#offersByType;
+    return this.#offersByType || {};
   }
 
   getDestinations() {
-    return this.#destinations;
+    return this.#destinations || [];
   }
 
   getOfferById(offerId) {
     for (const type in this.#offersByType) {
-      const offer = this.#offersByType[type].find((o) => o.id === offerId);
+      const offers = this.#offersByType[type] || [];
+      const offer = offers.find((o) => o.id === offerId);
       if (offer) {
         return offer;
       }
@@ -73,14 +74,16 @@ export default class PointsModel {
   }
 
   getDestinationById(destinationId) {
-    return this.#destinations.find((dest) => dest.id === destinationId);
+    return (this.#destinations || []).find((dest) => dest.id === destinationId) || null;
   }
 
   getOffersByIds(offerIds) {
+    const safeIds = Array.isArray(offerIds) ? offerIds : [];
     const result = [];
     for (const type in this.#offersByType) {
-      for (const offer of this.#offersByType[type]) {
-        if (offerIds.includes(offer.id)) {
+      const offers = this.#offersByType[type] || [];
+      for (const offer of offers) {
+        if (safeIds.includes(offer.id)) {
           result.push(offer);
         }
       }
@@ -89,16 +92,16 @@ export default class PointsModel {
   }
 
   getOffersByType(type) {
-    return this.#offersByType[type] || [];
+    return (this.#offersByType[type] || []);
   }
 
   getAllOffers() {
-    return this.#offersByType;
+    return this.#offersByType || {};
   }
 
   getPointsByFilter(filter) {
     const now = dayjs();
-    const allPoints = this.#points;
+    const allPoints = this.#points || [];
 
     switch (filter) {
       case FilterType.FUTURE:
