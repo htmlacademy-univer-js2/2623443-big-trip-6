@@ -5,31 +5,28 @@ function formatMonthDay(dateString) {
   if (!dateString) {
     return '';
   }
-  return dayjs(dateString).format('MMM D').toUpperCase();
+  return dayjs(dateString).format('D MMM').toUpperCase();
 }
 
 function createTripInfoTemplate({ route, startDate, endDate, totalCost }) {
   const startFormatted = formatMonthDay(startDate);
+  const endFormatted = formatMonthDay(endDate);
 
-  let datesStr = '';
-  if (startDate && endDate) {
-    const sameMonth = dayjs(startDate).month() === dayjs(endDate).month();
-    if (sameMonth) {
-      datesStr = `${startFormatted} — ${dayjs(endDate).format('D').toUpperCase()}`;
-    } else {
-      datesStr = `${startFormatted} — ${formatMonthDay(endDate)}`;
-    }
-  }
+  const datesStr = startDate && endDate
+    ? `${startFormatted} — ${endFormatted}`
+    : '';
+
+  const costSection = totalCost > 0
+    ? `<p class="trip-info__cost">Total: &euro;&nbsp;<span class="trip-info__cost-value">${totalCost}</span></p>`
+    : '';
 
   return `
     <section class="trip-main__trip-info trip-info">
       <div class="trip-info__main">
-        <h1 class="trip-info__title">${route}</h1>
+        <h1 class="trip-info__title">${route || ''}</h1>
         <p class="trip-info__dates">${datesStr}</p>
       </div>
-      <p class="trip-info__cost">
-        Total: &euro;&nbsp;<span class="trip-info__total-price">${totalCost}</span>
-      </p>
+      ${costSection}
     </section>
   `;
 }

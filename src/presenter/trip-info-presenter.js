@@ -21,7 +21,7 @@ export default class TripInfoPresenter {
   }
 
   #renderTripInfo() {
-    const points = this.#pointsModel.getPoints();
+    const points = this.#pointsModel.getPoints() || [];
     const { route, startDate, endDate, totalCost } = this.#calculateTripInfo(points);
 
     const prevComponent = this.#tripInfoComponent;
@@ -35,7 +35,7 @@ export default class TripInfoPresenter {
   }
 
   #calculateTripInfo(points) {
-    if (!points || points.length === 0) {
+    if (points.length === 0) {
       return { route: '', startDate: null, endDate: null, totalCost: 0 };
     }
 
@@ -46,10 +46,12 @@ export default class TripInfoPresenter {
       dayjs(point.dateTo).isAfter(dayjs(maxDate)) ? point.dateTo : maxDate
     , sortedByStart[0].dateTo);
 
-    const destNames = sortedByStart.map((point) => {
-      const dest = this.#pointsModel.getDestinationById(point.destinationId);
-      return dest ? dest.name : '';
-    }).filter((name) => name !== '');
+    const destNames = sortedByStart
+      .map((point) => {
+        const dest = this.#pointsModel.getDestinationById(point.destinationId);
+        return dest ? dest.name : '';
+      })
+      .filter((name) => name !== '');
 
     let routeStr = '';
     if (destNames.length === 1) {
@@ -62,14 +64,12 @@ export default class TripInfoPresenter {
       routeStr = `${destNames[0]} — ... — ${destNames[destNames.length - 1]}`;
     }
 
-    let totalCost = 0;
-    for (const point of points) {
-      totalCost += point.basePrice;
-      const offers = this.#pointsModel.getOffersByIds(point.offersIds);
-      for (const offer of offers) {
-        totalCost += offer.price;
-      }
-    }
+    const totalCost = points.reduce((sum, point) => {
+      const pointCost = point.basePrice || 0;
+      const offersCost = (this.#pointsModel.getOffersByIds(point.offersIds) || [])
+        .reduce((offerSum, offer) => offerSum + (offer.price || 0), 0);
+      return sum + pointCost + offersCost;
+    }, 0);
 
     return { route: routeStr, startDate, endDate, totalCost };
   }

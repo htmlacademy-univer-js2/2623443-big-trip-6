@@ -11,7 +11,13 @@ import { adaptPointToServer, adaptPointToClient } from '../api/adapter.js';
 import dayjs from 'dayjs';
 
 const sortPointsByDate = (pointA, pointB) => dayjs(pointA.dateFrom).diff(dayjs(pointB.dateFrom));
-const sortPointsByTime = (pointA, pointB) => dayjs(pointA.dateTo).diff(dayjs(pointA.dateFrom)) - dayjs(pointB.dateTo).diff(dayjs(pointB.dateFrom));
+
+const sortPointsByTime = (pointA, pointB) => {
+  const durationA = dayjs(pointA.dateTo).diff(dayjs(pointA.dateFrom));
+  const durationB = dayjs(pointB.dateTo).diff(dayjs(pointB.dateFrom));
+  return durationB - durationA;
+};
+
 const sortPointsByPrice = (pointA, pointB) => pointB.basePrice - pointA.basePrice;
 
 export default class Presenter {
@@ -29,6 +35,7 @@ export default class Presenter {
   #errorComponent = null;
   #currentSortType = 'day';
   #isDataLoaded = false;
+  #newEventButton = null;
 
   constructor({listComponent, pointsModel, filtersModel, tripInfoPresenter}) {
     this.#listComponent = listComponent;
@@ -36,6 +43,7 @@ export default class Presenter {
     this.#filtersModel = filtersModel;
     this.#tripInfoPresenter = tripInfoPresenter;
     this.#sortContainer = document.querySelector('.trip-events');
+    this.#newEventButton = document.querySelector('.trip-main__event-add-btn');
   }
 
   setFilterPresenter(filterPresenter) {
@@ -124,9 +132,11 @@ export default class Presenter {
       }
     }
 
+    const listContainer = this.#listComponent.querySelector('.trip-events__list');
+
     points.forEach((point) => {
       const pointPresenter = new PointPresenter({
-        listComponent: this.#listComponent,
+        listComponent: listContainer,
         point,
         model: this.#pointsModel,
         onDataChange: this.#handleViewAction,
@@ -138,8 +148,9 @@ export default class Presenter {
   }
 
   #renderNoPoints() {
+    const listContainer = this.#listComponent.querySelector('.trip-events__list');
     this.#noPointsComponent = new NoPointsView({filterType: this.#filtersModel.getFilter()});
-    render(this.#noPointsComponent, this.#listComponent);
+    render(this.#noPointsComponent, listContainer);
   }
 
   #clearList() {
@@ -153,12 +164,15 @@ export default class Presenter {
     }
     this.#pointPresenters.forEach((presenter) => presenter.destroy());
     this.#pointPresenters.clear();
+    const listContainer = this.#listComponent.querySelector('.trip-events__list');
+    if (listContainer) {
+      listContainer.innerHTML = '';
+    }
   }
 
   #setNewEventButtonListener() {
-    const newEventButton = document.querySelector('.trip-main__event-add-btn');
-    if (newEventButton) {
-      newEventButton.addEventListener('click', () => this.#handleNewEventClick());
+    if (this.#newEventButton) {
+      this.#newEventButton.addEventListener('click', () => this.#handleNewEventClick());
     }
   }
 
@@ -167,13 +181,21 @@ export default class Presenter {
       return;
     }
     this.#resetAllViews();
+    if (this.#noPointsComponent) {
+      remove(this.#noPointsComponent);
+      this.#noPointsComponent = null;
+    }
     this.#filtersModel.setFilter(FilterType.EVERYTHING);
+    this.#filterPresenter?.update();
     this.#currentSortType = 'day';
     if (this.#sortComponent) {
       remove(this.#sortComponent);
     }
     this.#renderSort();
     this.#renderFormCreate();
+    if (this.#newEventButton) {
+      this.#newEventButton.disabled = true;
+    }
   }
 
   #renderFormCreate() {
@@ -191,16 +213,13 @@ export default class Presenter {
       onDestinationChange: () => {}
     });
 
-    render(this.#formCreateComponent, this.#listComponent, 'afterbegin');
+    const listContainer = this.#listComponent.querySelector('.trip-events__list');
+    render(this.#formCreateComponent, listContainer, 'afterbegin');
   }
 
   async #handleFormCreateSubmit(state) {
-    if (!state.dateFrom || !state.dateTo || !state.destinationId || !state.basePrice) {
-      this.#formCreateComponent.setSaveError();
-      return;
-    }
-
-    this.#formCreateComponent.setSaving();
+    const formComponent = this.#formCreateComponent;
+    formComponent?.setSaving?.();
 
     const newPoint = {
       basePrice: Number(state.basePrice),
@@ -213,7 +232,7 @@ export default class Presenter {
     };
 
     try {
-      const serverPayload = adaptPointToServer(newPoint, false);
+      const serverPayload = adaptPointToServer(newPoint);
       const response = await apiCreatePoint(serverPayload);
 
       if (!response || !response.id) {
@@ -227,7 +246,9 @@ export default class Presenter {
       this.#removeFormCreate();
       this.#renderPoints();
     } catch (error) {
-      this.#formCreateComponent.setSaveError();
+      if (formComponent && this.#formCreateComponent === formComponent) {
+        formComponent.setSaveError?.();
+      }
     }
   }
 
@@ -235,6 +256,12 @@ export default class Presenter {
     if (this.#formCreateComponent) {
       remove(this.#formCreateComponent);
       this.#formCreateComponent = null;
+      if (this.#newEventButton) {
+        this.#newEventButton.disabled = false;
+      }
+      if (this.#pointsModel.getPoints().length === 0) {
+        this.#renderNoPoints();
+      }
     }
   }
 
@@ -247,6 +274,7 @@ export default class Presenter {
           pointPresenter.updatePoint(update);
         }
         this.#tripInfoPresenter?.update();
+        this.#renderPoints();
         break;
       }
       case UpdateType.DELETE: {
@@ -278,7 +306,13 @@ export default class Presenter {
 
   #resetAllViews() {
     this.#pointPresenters.forEach((presenter) => presenter.resetView());
-    this.#removeFormCreate();
+    if (this.#formCreateComponent) {
+      remove(this.#formCreateComponent);
+      this.#formCreateComponent = null;
+      if (this.#newEventButton) {
+        this.#newEventButton.disabled = false;
+      }
+    }
   }
 
   #escKeyDownHandler = (evt) => {
