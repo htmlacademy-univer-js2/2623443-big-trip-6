@@ -26,3 +26,5 @@ export const MS_IN_MINUTE = 60000;
 export const MINUTES_IN_HOUR = 60;
 export const MINUTES_IN_DAY = 1440;
 export const TOKEN_LENGTH = 16;
+export const MAX_SHORT_ROUTE_LENGTH = 3;
+export const MEDIUM_ROUTE_LENGTH = 2;

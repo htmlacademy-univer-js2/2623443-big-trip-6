@@ -37,11 +37,8 @@ const load = async (route, method = 'GET', body = null) => {
     throw new Error(`${response.status} ${response.statusText}`);
   }
 
-  if (response.status === 204) {
-    return null;
-  }
-
-  return await response.json();
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 };
 
 export const fetchPoints = () => load(ENDPOINTS.POINTS);

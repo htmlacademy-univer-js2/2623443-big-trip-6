@@ -21,7 +21,7 @@ function isSaveButtonDisabled(state) {
 
 function createFormEditTemplate(state, destinations, offersByType) {
   const { id, basePrice, dateFrom, dateTo, destinationId, offers, type } = state;
-  const currentDestination = destinations.find((dest) => dest.id === destinationId);
+  const currentDestination = destinations.find((destination) => destination.id === destinationId);
   const currentOffers = (offersByType[type] || []).filter(Boolean);
   const safeOffers = Array.isArray(offers) ? offers : [];
   const destinationName = currentDestination ? he.escape(currentDestination.name) : '';
@@ -54,7 +54,7 @@ function createFormEditTemplate(state, destinations, offersByType) {
             </label>
             <input class="event__input  event__input--destination" id="event-destination-${id}" type="text" name="event-destination" value="${destinationName}" list="destination-list-${id}">
             <datalist id="destination-list-${id}">
-              ${destinations.map((dest) => `<option value="${he.escape(dest.name)}"></option>`).join('')}
+              ${destinations.map((destination) => `<option value="${he.escape(destination.name)}"></option>`).join('')}
             </datalist>
           </div>
           <div class="event__field-group  event__field-group--time">
@@ -100,8 +100,8 @@ function createFormEditTemplate(state, destinations, offersByType) {
               ${currentDestination.pictures && currentDestination.pictures.length ? `
                 <div class="event__photos-container">
                   <div class="event__photos-tape">
-                    ${currentDestination.pictures.map((pic) => `
-                      <img class="event__photo" src="${he.escape(pic.src)}" alt="${he.escape(pic.description)}">
+                    ${currentDestination.pictures.map((picture) => `
+                      <img class="event__photo" src="${he.escape(picture.src)}" alt="${he.escape(picture.description)}">
                     `).join('')}
                   </div>
                 </div>
@@ -223,7 +223,7 @@ export default class FormEditView extends AbstractStatefulView {
   };
 
   #destinationChangeHandler = (evt) => {
-    const selectedDestination = this.#destinations.find((dest) => dest.name === evt.target.value);
+    const selectedDestination = this.#destinations.find((destination) => destination.name === evt.target.value);
     if (selectedDestination) {
       this.updateElement({ destinationId: selectedDestination.id });
     }
@@ -234,7 +234,7 @@ export default class FormEditView extends AbstractStatefulView {
   };
 
   #offersChangeHandler = () => {
-    const offers = Array.from(this.element.querySelectorAll('.event__offer-checkbox:checked')).map((el) => el.value);
+    const offers = Array.from(this.element.querySelectorAll('.event__offer-checkbox:checked')).map((checkboxElement) => checkboxElement.value);
     this._setState({ offers });
   };
 
