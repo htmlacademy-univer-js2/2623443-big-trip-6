@@ -62,19 +62,23 @@ export default class PointsModel {
     return this.#destinations || [];
   }
 
+  getDestinationById(destinationId) {
+    return this.findDestinationById(destinationId);
+  }
+
+  findDestinationById(destinationId) {
+    return (this.#destinations || []).find((destination) => destination.id === destinationId) || null;
+  }
+
   getOfferById(offerId) {
     for (const type in this.#offersByType) {
       const offers = this.#offersByType[type] || [];
-      const offer = offers.find((o) => o.id === offerId);
+      const offer = offers.find((offerItem) => offerItem.id === offerId);
       if (offer) {
         return offer;
       }
     }
     return null;
-  }
-
-  getDestinationById(destinationId) {
-    return (this.#destinations || []).find((dest) => dest.id === destinationId) || null;
   }
 
   getOffersByIds(offerIds) {

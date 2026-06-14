@@ -8,6 +8,7 @@ import { render, remove } from '../framework/render.js';
 import { UpdateType, FilterType } from '../const.js';
 import { createPoint as apiCreatePoint } from '../api/api-service.js';
 import { adaptPointToServer, adaptPointToClient } from '../api/adapter.js';
+import { isEscapeKey } from '../utils/key.js';
 import dayjs from 'dayjs';
 
 const sortPointsByDate = (pointA, pointB) => dayjs(pointA.dateFrom).diff(dayjs(pointB.dateFrom));
@@ -316,7 +317,7 @@ export default class Presenter {
   }
 
   #escKeyDownHandler = (evt) => {
-    if (evt.key === 'Escape' || evt.key === 'Esc') {
+    if (isEscapeKey(evt)) {
       evt.preventDefault();
       if (this.#formCreateComponent) {
         this.#removeFormCreate();

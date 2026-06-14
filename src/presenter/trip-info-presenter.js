@@ -1,5 +1,6 @@
 import TripInfoView from '../view/trip-info-view.js';
 import { render, replace } from '../framework/render.js';
+import { MAX_SHORT_ROUTE_LENGTH, MEDIUM_ROUTE_LENGTH } from '../const.js';
 import dayjs from 'dayjs';
 
 export default class TripInfoPresenter {
@@ -48,21 +49,12 @@ export default class TripInfoPresenter {
 
     const destNames = sortedByStart
       .map((point) => {
-        const dest = this.#pointsModel.getDestinationById(point.destinationId);
-        return dest ? dest.name : '';
+        const destination = this.#pointsModel.findDestinationById(point.destinationId);
+        return destination ? destination.name : '';
       })
       .filter((name) => name !== '');
 
-    let routeStr = '';
-    if (destNames.length === 1) {
-      routeStr = destNames[0];
-    } else if (destNames.length === 2) {
-      routeStr = `${destNames[0]} — ${destNames[1]}`;
-    } else if (destNames.length === 3) {
-      routeStr = `${destNames[0]} — ${destNames[1]} — ${destNames[2]}`;
-    } else {
-      routeStr = `${destNames[0]} — ... — ${destNames[destNames.length - 1]}`;
-    }
+    const routeStr = this.#buildRouteString(destNames);
 
     const totalCost = points.reduce((sum, point) => {
       const pointCost = point.basePrice || 0;
@@ -72,5 +64,21 @@ export default class TripInfoPresenter {
     }, 0);
 
     return { route: routeStr, startDate, endDate, totalCost };
+  }
+
+  #buildRouteString(destNames) {
+    if (destNames.length === 0) {
+      return '';
+    }
+    if (destNames.length === 1) {
+      return destNames[0];
+    }
+    if (destNames.length === MEDIUM_ROUTE_LENGTH) {
+      return `${destNames[0]} — ${destNames[1]}`;
+    }
+    if (destNames.length === MAX_SHORT_ROUTE_LENGTH) {
+      return `${destNames[0]} — ${destNames[1]} — ${destNames[2]}`;
+    }
+    return `${destNames[0]} — ... — ${destNames[destNames.length - 1]}`;
   }
 }
